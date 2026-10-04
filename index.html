@@ -765,7 +765,30 @@ function zoom(id){const p=find(id);if(!p||!p.img)return;
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
 function moreNotes(){return notesAll?'':'<div class="panel mu" style="margin:0 0 10px">Mostrando las notas de los últimos 60 días. <button class="btn s g" onclick="loadAllNotes()">Ver notas anteriores</button></div>'}
 function renderNotes(){
- $('#app').innerHTML=moreNotes()+(db.notes.length?db.notes.map(n=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="showNote(${n.no})"><div class="i"><b>Nota N.º ${String(n.no).padStart(5,'0')}</b><div class="mu">${new Date(n.date).toLocaleString('es')} · ${esc(n.client)}${n.void?' · ANULADA':''}</div></div><b style="${n.void?'text-decoration:line-through;color:var(--danger)':''}">${money(n.total)}</b></div>`).join(''):'<div class="empty">Aún no hay notas de entrega.</div>');
+ const anul=db.notes.filter(n=>n.void).length;
+ const cabeza=`<div class="row" style="margin:0 0 10px"><span class="mu">${db.notes.length} nota(s)${anul?' · '+anul+' anulada(s)':''}</span>
+ <span style="flex:1"></span>${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgaNotasAnuladas()">🗑 Borrar las ${anul} anuladas</button>`:''}</div>`;
+ $('#app').innerHTML=moreNotes()+cabeza+(db.notes.length?db.notes.map(n=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="showNote(${n.no})"><div class="i"><b>Nota N.º ${String(n.no).padStart(5,'0')}</b><div class="mu">${new Date(n.date).toLocaleString('es')} · ${esc(n.client)}${n.void?' · ANULADA':''}</div></div><b style="${n.void?'text-decoration:line-through;color:var(--danger)':''}">${money(n.total)}</b></div>`).join(''):'<div class="empty">Aún no hay notas de entrega.</div>');
+}
+function delNota(no){
+ const n=db.notes.find(x=>x.no===no);if(!n)return;
+ const msj=n.void
+  ?'¿Borrar la nota N.º '+String(no).padStart(5,'0')+'?\n\nEstá anulada, así que su stock ya se devolvió al inventario. Solo se borra el registro de la nota.'
+  :'Esta nota NO está anulada.\n\nSi la borras, el stock que ya descontaste se queda descontado. Solo hazlo si fue una prueba y los artículos siguen con el stock correcto.\n\n¿Borrar la nota de todos modos?';
+ if(!confirm(msj))return;
+ db.notes=db.notes.filter(x=>x.no!==no);
+ if(R)R.doc('notes/'+no).delete().catch(se);else save();
+ closeM();render();alert('Nota N.º '+String(no).padStart(5,'0')+' borrada.');
+}
+function purgaNotasAnuladas(){
+ const L=db.notes.filter(n=>n.void);
+ if(!L.length)return alert('No hay notas anuladas.');
+ if(!confirm('Vas a borrar '+L.length+' nota(s) anuladas.\n\nSu stock ya se devolvió al inventario cuando se anularon, así que no se toca nada más.\n\nLos números de nota quedarán con huecos y no se reutilizan.\n\n¿Continuar?'))return;
+ const nos=L.map(n=>n.no);
+ db.notes=db.notes.filter(n=>!nos.includes(n.no));
+ if(R)nos.forEach(no=>R.doc('notes/'+no).delete().catch(se));else save();
+ render();
+ alert(L.length+' nota(s) anuladas borradas. Los números no se reutilizan.');
 }
 function showNote(no){
  const n=db.notes.find(x=>x.no===no);
@@ -776,7 +799,7 @@ function showNote(no){
  ${n.items.map(i=>`<tr><td>${i.qty}</td><td>${esc(i.name)}<br><small>${esc(i.code)}</small></td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
  <tr><td colspan="3" class="r"><b>TOTAL</b></td><td class="r"><b>${money(n.total)}</b></td></tr>${n.bs>0?`<tr><td colspan="3" class="r"><b>TOTAL Bs</b></td><td class="r"><b>Bs ${bsf(n.bs)}</b></td></tr>`:''}</table></div>
  <div class="sig"><div>Entregado por</div><div>Recibido por</div></div></div>
- <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">⬇ Descargar PDF</button><button class="btn" style="background:#16a34a" onclick="pdfNote(${n.no},true)">WhatsApp</button><button class="btn g" onclick="window.print()">🖨 Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" style="color:var(--danger)" onclick="voidNote(${n.no})">Anular nota</button>`}<button class="btn g" onclick="closeM()">Cerrar</button></div>`;
+ <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">⬇ Descargar PDF</button><button class="btn" style="background:#16a34a" onclick="pdfNote(${n.no},true)">WhatsApp</button><button class="btn g" onclick="window.print()">🖨 Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" style="color:var(--danger)" onclick="voidNote(${n.no})">Anular nota</button>`}<button class="btn g" onclick="closeM()">Cerrar</button><button class="btn g" style="color:var(--danger)" onclick="delNota(${n.no})">Borrar nota</button></div>`;
  $('#modal').classList.add('on');
 }
 function clients(){
