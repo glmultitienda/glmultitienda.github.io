@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js" defer></script>
 <script>
 window.addEventListener('error',function(e){var b=document.getElementById('lbox');if(b&&!window.FB)b.innerHTML='<h2 style="margin:0">🔧 GL Multitienda</h2><p style="color:#d62828">Error: '+String(e.message).replace(/</g,'&lt;')+'</p><p>Recarga con Ctrl+Shift+R.</p>'});
 window.addEventListener('fberror',function(){var b=document.getElementById('lbox');if(b)b.innerHTML='<h2 style="margin:0">🔧 GL Multitienda</h2><p style="color:#d62828">No se pudo cargar Firebase: '+String(window.__fbErr&&window.__fbErr.message||'error').replace(/</g,'&lt;')+'</p><p>Revisa tu internet, desactiva el VPN y recarga con Ctrl+Shift+R.</p>'});
@@ -46,7 +47,7 @@ body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-app
 header{background:linear-gradient(135deg,var(--pr) 0%,var(--pr2) 100%);color:#fff;padding:14px 16px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;box-shadow:var(--sh)}
 header h1{margin:0;font-size:19px}header small{opacity:.85}
 nav{display:flex;gap:6px;margin-top:10px}
-nav button{flex:1;background:rgba(255,255,255,.16);color:#fff;border:0;padding:12px 2px;border-radius:9px;font-weight:600;font-size:13px;cursor:pointer}
+nav button{flex:1 1 92px;min-width:0;background:rgba(255,255,255,.16);color:#fff;border:0;padding:12px 2px;border-radius:9px;font-weight:600;font-size:13px;cursor:pointer}
 nav button.on{background:#fff;color:var(--pr);box-shadow:0 1px 3px rgba(0,0,0,.18)}
 main{max-width:1000px;margin:0 auto;padding:14px}
 input,select,button{font:inherit}
@@ -82,6 +83,8 @@ input,select{width:100%;padding:12px;border:1px solid var(--bd);border-radius:9p
 .note th,.note td{border-bottom:1px solid #ccc;padding:6px 4px;text-align:left;font-size:14px}
 .note .r{text-align:right}.sig{display:flex;gap:30px;margin-top:50px}.sig div{flex:1;border-top:1px solid #000;text-align:center;font-size:13px;padding-top:4px}
 .empty{text-align:center;color:var(--mu);padding:36px}
+.bta{width:100%;padding:10px;border:1px solid var(--bd);border-radius:9px;background:var(--card);color:var(--tx);font:13px/1.45 ui-monospace,Consolas,monospace;resize:vertical;min-height:110px}
+.bta:focus{outline:2px solid var(--acc);outline-offset:-1px}
 @media print{body>*:not(#modal){display:none!important}#modal{position:static;background:none;padding:0;display:block}.box{box-shadow:none;padding:0;max-width:none}.noprint{display:none!important}}
 #lock{position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
 @media(max-width:480px){header h1 small{display:none}
@@ -94,14 +97,14 @@ header .btn.s{min-height:34px;padding:6px 10px}main{padding:12px 12px 24px}}
 <button class="btn s" style="position:absolute;right:12px;top:12px;background:rgba(255,255,255,.2)" onclick="logout()">Salir 🔒</button>
 <h1>🔧 GL Multitienda <small>· Inventario</small></h1><small id="st" style="display:block;font-size:12px;opacity:.9">Conectando…</small>
 <div class="row" style="margin:6px 0 0;gap:6px"><button id="rateBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openCalc()">🧮 Tasa</button><button id="parBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openSet()">📈 Paralelo</button></div>
-<nav><button data-v="inv" class="on">Inventario</button><button data-v="sell">Vender</button><button data-v="notes">Notas</button><button data-v="cli">Clientes</button><button data-v="rep">Reportes</button></nav>
+<nav><button data-v="inv" class="on">Inventario</button><button data-v="sell">Vender</button><button data-v="notes">Notas</button><button data-v="compras">Compras</button><button data-v="cli">Clientes</button><button data-v="rep">Reportes</button></nav>
 </header>
 <main id="app"></main>
 <div id="lock"><div class="box" id="lbox" style="max-width:380px"><h2 style="margin:0">🔧 GL Multitienda</h2><p class="mu">Cargando… (v13)</p></div></div>
 <div id="modal"><div class="box" id="box"></div></div>
 
 <script>
-let LOGO=null,CL=[],db={parts:[],notes:[]},R=null,mig=false,view='inv',q='',cart=[],client={name:'',phone:'',ci:''};
+let LOGO=null,CL=[],db={parts:[],notes:[],compras:[]},R=null,mig=false,view='inv',q='',cart=[],client={name:'',phone:'',ci:''};
 let USER=null,synced=false,payMethod='Efectivo',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum'};
 const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro'];
 const ADMINS=[]; // correos con acceso a costos y ganancias (vacío = todos)
@@ -111,11 +114,11 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const money=n=>'$'+(+n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2});
 const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
-try{const s=localStorage.getItem('glm_db');if(s){db=JSON.parse(s);db.notes=db.notes||[]}}catch(e){}
+try{const s=localStorage.getItem('glm_db');if(s){db=JSON.parse(s);db.notes=db.notes||[];db.compras=db.compras||[]}}catch(e){}
 const LOC=JSON.parse(JSON.stringify(db));
 try{const t=localStorage.getItem('glm_logo');if(t)LOGO=JSON.parse(t)}catch(e){}
 const se=e=>alert('No se pudo sincronizar: '+((e&&e.message)||'error'));
-function commit(ps=[],ns=[]){if(!R)return save();const c=o=>JSON.parse(JSON.stringify(o));ps.forEach(p=>R.doc('parts/'+p.id).set(c(p)).catch(se));ns.forEach(n=>R.doc('notes/'+n.no).set(c(n)).catch(se));return true}
+function commit(ps=[],ns=[],cs=[]){if(!R)return save();const c=o=>JSON.parse(JSON.stringify(o));ps.forEach(p=>R.doc('parts/'+p.id).set(c(p)).catch(se));ns.forEach(n=>R.doc('notes/'+n.no).set(c(n)).catch(se));cs.forEach(k=>R.doc('compras/'+k.id).set(c(k)).catch(se));return true}
 function save(){if(R)return true;try{localStorage.setItem('glm_db',JSON.stringify(db));return true}catch(e){alert('No se pudo guardar (almacenamiento lleno). Exporta un respaldo y usa fotos más pequeñas.');return false}}
 const find=id=>db.parts.find(p=>p.id===id);
 const nz=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -126,7 +129,7 @@ const pic=p=>p.img?`<img src="${p.img}" alt="" style="cursor:zoom-in" onclick="z
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{view=b.dataset.v;q='';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));render()});
 
 function render(){
- if(view==='inv')renderInv();else if(view==='sell')renderSell();else if(view==='cli')renderCli();else if(view==='rep')renderRep();else renderNotes();
+ if(view==='inv')renderInv();else if(view==='sell')renderSell();else if(view==='cli')renderCli();else if(view==='rep')renderRep();else if(view==='compras')renderCompras();else renderNotes();
 }
 function search(ph='Buscar por nombre, código o marca…'){return `<input id="q" type="search" autocomplete="off" placeholder="${ph}" value="${esc(q)}" oninput="q=this.value;refreshList()">`}
 function bsf(n){return (+n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -251,7 +254,7 @@ function refreshList(){const el=$('#list');if(!el)return;el.innerHTML=view==='in
 /* ---------- INVENTARIO ---------- */
 function renderInv(){
  const val=db.parts.reduce((a,p)=>a+p.stock*pr(p,'bcv'),0),valh=db.parts.reduce((a,p)=>a+p.stock*pr(p,'cash'),0),valc=db.parts.reduce((a,p)=>a+p.stock*(p.cost||0),0);
- $('#app').innerHTML=`<div class="row">${search()}<button class="btn" onclick="editPart()">+ Nuevo repuesto</button></div>
+ $('#app').innerHTML=`<div class="row">${search()}<button class="btn" onclick="editPart()">+ Nuevo repuesto</button><button class="btn g" onclick="openBulk()">📥 Carga rápida</button></div>
  <div class="mu" style="margin-bottom:8px">${db.parts.length} repuestos · ${isAdmin()?'Invertido (costo): '+money(valc)+' · ':''}Venta BCV: ${money(val)} · Venta CASH: ${money(valh)}</div>
  ${chips()}
  <div id="list" class="grid">${invList()}</div>
@@ -313,7 +316,316 @@ async function exportDb(){
 }
 function importDb(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.parts)throw 0;if(confirm('Esto reemplazará los datos actuales. ¿Continuar?')){db=d;db.notes=d.notes||[];commit(d.parts.map(p=>({ts:0,...p})),db.notes);render()}}catch(e){alert('Archivo no válido')}};r.readAsText(f)}
 
-/* ---------- VENDER ---------- */
+/* ---------- NOTAS DE COMPRA / CARGA RAPIDA ---------- */
+let BLK={rows:[],mark:100,meta:{},ocr:null};
+function hoy(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
+function esDoc(x){return /^(\d{4})-(\d{2})-(\d{2})/.exec(String(x||''))||null}
+function fmtFec(x){const m=esDoc(x);return m?m[3]+'/'+m[2]+'/'+m[1]:(x?String(x):'')}
+function bnum(v){let s=String(v==null?'':v).trim().replace(/[^\d.,-]/g,'');if(!s)return NaN;
+ if(s.includes(',')&&s.includes('.'))s=s.lastIndexOf(',')>s.lastIndexOf('.')?s.replace(/\./g,'').replace(',','.'):s.replace(/,/g,'');
+ else if(s.includes(','))s=s.replace(',','.');
+ const n=parseFloat(s);return isFinite(n)?n:NaN}
+function bprecio(t){
+ t=String(t||'').trim();
+ // el POS de algunas Impressiones imprime el precio como "9 88 —" (espacio en vez de punto)
+ let m=t.match(/^(\d{1,4})[\s.](\d{1,2})[-\s—–».,]*$/);
+ if(m&&!t.includes('.'))return +m[1]+(+m[2]/Math.pow(10,m[2].length));
+ return bnum(t)}
+function bsplit(l){for(const d of ['|','\t',';'])if(l.includes(d))return l.split(d);
+ if(/\s{2,}/.test(l))return l.split(/\s{2,}/);
+ return l.split(/\s+/)}
+function rva(r){const r2={...r};bulkCalc(r2);return r2}
+function browNota(line){
+ let p=line.replace(/\|/g,' ').trim().split(/\s+/).filter(Boolean);
+ if(p.length<3)return null;
+ p=p.map(t=>t.replace(/^[^A-Za-z0-9$.]+/,'').replace(/[^A-Za-z0-9%)]+$/,'')).filter(Boolean);
+ if(p.length<3)return null;
+ const isn=t=>/^\d{1,3}(?:[.,]\d{1,2})?$/.test(t);
+ const r={code:'',brand:'',name:'',qty:'',cost:'',sub:'',mark:BLK.mark,pbcv:'',pcash:'',pml:'',base:'',mB:0,mC:0,mM:0,aviso:''};
+ const got=[];let i=p.length;
+ while(i>0&&got.length<3){const t=p[i-1];
+  if(isn(t)){got.unshift(t);i--}
+  else if(t.length<=2)i--;
+  else break}
+ if(got.length>=1)r.sub=bprecio(got[got.length-1]);
+ if(got.length>=2)r.cost=bprecio(got[got.length-2]);
+ if(got.length>=3)r.qty=bnum(got[got.length-3]);
+ p=p.slice(0,i);
+ if(p.length>=2&&/^[A-Za-z0-9][A-Za-z0-9._\-\/&#+]{2,17}$/.test(p[0]))r.code=p.shift();
+ if(p.length>=2&&r.code&&p[0].length<=8&&/^[A-Z][A-Z0-9&.\-]+$/.test(p[0]))r.brand=p.shift();
+ r.name=p.join(' ');
+ if(!r.name)return null;
+ if(!r.qty&&r.sub>0&&r.cost>0){const q=r.sub/r.cost;if(q>=0.1&&q<10000)r.qty=Math.round(q*100)/100;}
+ bulkCalc(r);
+ if(!(r.qty>0))r.aviso='Revisa la cantidad';
+ else if(!(r.cost>0))r.aviso='Revisa el costo';
+ else if(r.sub>0&&Math.abs(r.qty*r.cost-r.sub)>Math.max(0.03,r.sub*0.03))r.aviso='El subtotal de la nota ('+money(r.sub)+') no cuadra con cantidad × costo ('+money(r.qty*r.cost)+')';
+ return r}
+function brow(line){
+ const p=bsplit(line).map(x=>String(x).trim()).filter(Boolean);
+ const r={code:'',qty:'1',name:'',cost:'',sub:'',mark:BLK.mark,pbcv:'',pcash:'',pml:'',base:'',mB:0,mC:0,mM:0,aviso:''};
+ if(!p.length)return null;
+ for(let i=p.length-1;i>=Math.max(0,p.length-2);i--){if(/\d/.test(p[i])&&isFinite(bprecio(p[i]))){r.cost=p[i];p.splice(i,1);break}}
+ let k=0;while(k<p.length&&/^\d{1,4}$/.test(p[k]))k++;
+ if(k>=2){r.code=p[0];r.qty=p[1];p.splice(0,2)}
+ else if(k===1){r.qty=p[0];p.splice(0,1)}
+ else{if(p.length>1&&/^[A-Za-z0-9][A-Za-z0-9._\-\/&#+]{0,18}$/.test(p[0]))r.code=p.shift();
+  const j=p.findIndex(x=>/^\d{1,4}$/.test(x));
+  if(j>=0){r.qty=p[j];p.splice(j,1)}}
+ r.name=p.join(' ');
+ if(!r.name)return null;
+ bulkCalc(r);return r}
+function bulkCalc(r){
+ const c=bprecio(r.cost)||0,d=1+difPct()/100;
+ if(c>0&&!r.mB&&r.mark>0)r.pbcv=Math.round(c*(1+r.mark/100)*d*100)/100;
+ const bv=bnum(r.pbcv)||0;
+ if(!r.mC)r.pcash=bv?cashOf(bv):'';
+ if(!r.mM)r.pml=(bnum(r.pcash)||0)?Math.round(mlPrice(bnum(r.pcash))*100)/100:'';
+ r.base=bv?Math.round((bv/d)*10000)/10000:'';
+ r.costo=bprecio(r.cost)||0;}
+function bdec(r){const n=bnum(r.cost)||0;
+ return (Number.isInteger(n)&&n>=11&&n%100>0)?Math.floor(n/100)+(n%100)/100:0}
+function bulkFix(i){const r=BLK.rows[i];const v=bdec(r);if(!v)return;
+ r.cost=v;if(bnum(r.qty)===1||!bnum(r.qty))r.sub=v;r.mB=1;bulkCalc(r);renderBulk()}
+function bdup(r){
+ const k=nz(r.code),n=nz(r.name);
+ return db.parts.find(p=>(k&&nz(p.code||'')===k)||(n&&nz(p.name||'')===n))||null}
+function bmal(r){const q=bnum(r.qty)||0,c=bprecio(r.cost)||0;
+ if(!(q>0))return 'falta cantidad';
+ if(!(c>0))return 'falta costo';
+ if(r.sub>0&&Math.abs(q*c-r.sub)>Math.max(0.05,r.sub*0.05))return 'subtotal no cuadra ('+money(r.sub)+' vs '+money(q*c)+')';
+ return ''}
+function bulkUnid(){return BLK.rows.reduce((a,r)=>a+(bnum(r.qty)||0),0)}
+function bulkCosto(){return BLK.rows.reduce((a,r)=>a+(bprecio(r.cost)||0)*(bnum(r.qty)||0),0)}
+function bulkMalos(){return BLK.rows.filter(r=>bmal(r)).length}
+function comprimeImg(file,maxPx,q0){
+ return new Promise((res,rej)=>{
+  const rd=new FileReader();
+  rd.onload=()=>{const im=new Image();
+   im.onload=()=>{let k=Math.min(1,maxPx/Math.max(im.width,im.height)),q=q0;
+    const dib=()=>{const c=document.createElement('canvas');
+     c.width=Math.max(1,Math.round(im.width*k));c.height=Math.max(1,Math.round(im.height*k));
+     const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);
+     x.imageSmoothingQuality='high';x.drawImage(im,0,0,c.width,c.height);return c.toDataURL('image/jpeg',q)};
+    let u=dib();
+    while(u.length>700000&&k>0.25){k*=0.82;q=Math.max(0.35,q-0.1);u=dib()}
+    res(u)};
+   im.onerror=()=>rej(new Error('no se pudo leer la imagen'));
+   im.src=rd.result};
+  rd.onerror=()=>rej(new Error('no se pudo leer el archivo'));
+  rd.readAsDataURL(file)})}
+function openBulk(){
+ $('#box').innerHTML=`<div style="max-width:680px;margin:0 auto"><h3 style="margin:0">📥 Nota de entrega</h3>
+ <div class="mu" style="margin-top:4px">Toma una foto de la nota de entrega y la app leerá sola los artículos y los datos. Todo queda editable antes de guardar.</div>
+
+ <div class="panel" style="margin-top:12px;padding:12px"><div class="row" style="margin:0 0 8px"><b>1. Foto de la nota</b></div>
+ <div class="row" style="margin:0;gap:8px"><label class="btn g s" style="flex:0 0 auto">📷 Elegir foto<input type="file" accept="image/*" hidden onchange="ocrFoto(this)"></label>
+ <span class="mu" id="b_finfo"></span></div>
+ <div id="b_prog" class="mu" style="margin-top:8px"></div></div>
+
+ <div class="panel" style="padding:12px"><div class="row" style="margin:0 0 8px"><b>2. Datos de la nota</b>
+ <span style="flex:1"></span><span class="mu">Margen:</span><select id="b_mk" style="width:auto;min-width:92px" onchange="bulkMarka(+this.value)"><option value="50" ${BLK.mark===50?'selected':''}>+50%</option><option value="100" ${BLK.mark===100?'selected':''}>+100%</option></select><button class="btn g s" onclick="bulkMarka(50)">Todos +50%</button><button class="btn g s" onclick="bulkMarka(100)">Todos +100%</button></div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">
+ <div style="grid-column:1/-1"><label>Proveedor</label><input id="b_prov" value="${esc(BLK.meta.prov||'')}" placeholder="Nombre del proveedor"></div>
+ <div><label>No. de nota</label><input id="b_num" value="${esc(BLK.meta.num||'')}" placeholder="17909"></div>
+ <div><label>Orden No.</label><input id="b_ord" value="${esc(BLK.meta.orden||'')}" placeholder="11137"></div>
+ <div><label>Fecha de la nota</label><input id="b_fec" type="date" value="${esc(BLK.meta.fecha||'')}"></div>
+ <div><label>Fecha de recepción</label><input id="b_rec" type="date" value="${esc(BLK.meta.recibido||hoy())}"></div>
+ <div><label>Forma de pago</label><select id="b_pag" onchange="bPag()"><option value="contado" ${BLK.meta.credito==='contado'?'selected':''}>Contado</option><option value="credito" ${BLK.meta.credito!=='contado'?'selected':''}>A crédito</option></select></div>
+ <div id="b_cad_wrap"><label>Vence (fecha de caducidad)</label><input id="b_cad" type="date" value="${esc(BLK.meta.vence||'')}"></div>
+ <div><label>Total de la nota $</label><input id="b_tot_in" inputmode="decimal" value="${esc(BLK.meta.total||'')}" placeholder="329.11"></div>
+ </div></div>
+
+ <details style="margin-top:10px"><summary class="mu" style="cursor:pointer">Ver el texto que leyó de la foto</summary><pre id="b_raw" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:190px;overflow:auto;margin:8px 0 0"></pre></details>
+ <div id="b_av" class="mu" style="margin-top:10px"></div>
+ <div id="b_lote"></div></div>`;
+ $('#modal').classList.add('on');renderBulk();
+}
+function bPag(){const c=$('#b_pag').value;const w=$('#b_cad_wrap');
+ if(w)w.style.display=c==='credito'?'':'none';
+ const v=$('#b_cad');
+ if(c==='credito'&&v&&!v.value&&BLK.meta.vence)v.value=BLK.meta.vence||'';}
+async function ocrFoto(inp){
+ const f=inp.files[0];if(!f)return;
+ const info=$('#b_finfo'),prog=$('#b_prog');
+ if(typeof Tesseract!=='object'){alert('El lector de fotos no cargó. Revisa tu internet y recarga la página. Si no funciona, puedes pegar el texto a mano.');return}
+ info.textContent=f.name;
+ prog.innerHTML='Preparando la foto…';
+ try{
+  const data=await comprimeImg(f,1800,0.85);
+  prog.innerHTML='Leyendo la foto. Puede tardar de 20 a 60 segundos…';
+  const r=await Tesseract.recognize(data,'spa',{logger:m=>{if(m.status==='recognizing text')prog.innerHTML='Leyendo la foto… '+Math.round((m.progress||0)*100)+'%'}});
+  const txt=r.data.text||'';
+  prog.innerHTML='<span style="color:var(--ok)">Foto leída (confianza '+Math.round(r.data.confidence)+'%).</span> <span style="color:var(--wa)">Revisa sobre todo cantidades y costos.</span>';
+  const cab=bCab(txt);
+  BLK.ocr=conf=r.data.confidence;
+BLK.txt=txt;
+   const rs=bulkAnalizaTxt(txt);
+  if(cab.num&&!$('#b_num').value)$('#b_num').value=cab.num;
+  if(cab.fecha&&!$('#b_fec').value)$('#b_fec').value=cab.fecha;
+  if(cab.vence)$('#b_cad').value=cab.vence;
+  if(cab.credito)$('#b_pag').value='credito';
+  if(cab.total&&!$('#b_tot_in').value)$('#b_tot_in').value=cab.total;
+  bPag();
+  if(!rs.length)prog.innerHTML+='<br>No encontré líneas de artículos. Revisa el texto y usa Analizar.';
+ }catch(e){
+  prog.innerHTML='<span style="color:var(--danger)">No se pudo leer la foto: '+esc(String(e.message||e).slice(0,120))+'</span><br>Puedes pegar el texto a mano.';
+ }
+}
+function bCab(txt){
+ const o={num:'',fecha:'',vence:'',total:'',credito:false};
+ let m=/No\.?\s*[:.]?\s*(\d{3,8})/i.exec(txt);if(m)o.num=m[1];
+ m=/Fecha[:.\s]*(\d{2})[-\/](\d{2})[-\/](\d{2,4})/i.exec(txt);
+ if(m){let y=m[3].length===2?'20'+m[3]:m[3];o.fecha=y+'-'+m[2]+'-'+m[1]}
+ m=/Vence[:.\s]*(\d{2})[-\/](\d{2})[-\/](\d{2,4})/i.exec(txt);
+ if(m){let y=m[3].length===2?'20'+m[3]:m[3];o.vence=y+'-'+m[2]+'-'+m[1]}
+ if(/a\s*cr[eé]dito/i.test(txt))o.credito=true;
+ m=/^\s*Total\b[^:\n]*:?\s*([\d.,]+)/im.exec(txt);if(m&&!/sub/i.test(m[0]))o.total=m[1];
+ return o}
+function bulkAnalizaTxt(txt){
+ const rs=[];const malas=[];
+ txt.split(/\r?\n/).forEach(l=>{
+  const t=l.trim();if(!t)return;
+  if(!/\d/.test(t))return;
+  if(/^(total|subtotal|sub\s*total|iva|costo|importe|descuento|cant|cantidad|codigo|descripcion|marca)\b/i.test(t))return;
+  if(/^(cliente|referencia|direccion|ciudad|sector|tel|vendedor|orden|bultos|page|fecha|vence|observa|entregado|despachado|recibido|pague|conserv|cambios|no\.|no:)\b/i.test(t))return;
+  if(/pag[uo]|conserv|reglas especiales|entregado por|despachado por|recibido|observac/i.test(t))return;
+  const r=browNota(t);
+  if(r&&r.name&&(bnum(r.qty)>0||bprecio(r.cost)>0))rs.push(r);
+  else if(r&&r.name)malas.push(t);
+ });
+ BLK.rows=rs;BLK.page=0;
+ BLK.malas=malas;renderBulk();
+ return rs}
+function bulkLimpia(){BLK.rows=[];BLK.malas=[];renderBulk()}
+function bulkSet(i,f,v){BLK.rows[i][f]=v;bulkCalc(BLK.rows[i]);renderBulk()}
+function bulkSetMark(i,v){const r=BLK.rows[i];r.mark=+v;r.mB=r.mC=r.mM=0;bulkCalc(r);renderBulk()}
+function bulkSetP(i,f,v,fl){const r=BLK.rows[i];r[f]=v;r[fl]=1;bulkCalc(r);renderBulk()}
+function bulkMarka(m){BLK.rows.forEach(r=>{r.mark=m;r.mB=r.mC=r.mM=0;bulkCalc(r)});renderBulk()}
+function bulkCard(r,i){
+ const d=bdup(r),w=bmal(r),sug=bdec(r);
+ return `<div class="panel" style="margin:0 0 10px;padding:12px;${w?'border-color:var(--wa)':''}">
+ <div class="row" style="margin:0 0 8px;gap:6px"><b style="color:var(--acc)">#${i+1}</b>
+ ${d?`<span class="tag low">ya existe</span>`:''}${w?`<span class="tag" style="background:var(--wa)">${esc(w)}</span>`:''}
+ ${sug?`<button class="btn g s" onclick="bulkFix(${i})" title="El lector probablemente juntó los decimales">⚠ ¿era ${money(sug)}? corregí</button>`:''}
+ <span style="flex:1"></span><button class="btn g s" onclick="bulkRm(${i})">Quitar</button></div>
+ <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
+ <div><label>Código</label><input value="${esc(r.code)}" onchange="bulkSet(${i},'code',this.value)"></div>
+ <div><label>Cantidad</label><input type="number" step="1" inputmode="numeric" value="${esc(r.qty)}" onchange="bulkSet(${i},'qty',this.value)"></div>
+ <div style="grid-column:1/-1"><label>Descripción</label><input value="${esc(r.name)}" onchange="bulkSet(${i},'name',this.value)"></div>
+ <div><label>Marca</label><input value="${esc(r.brand||'')}" onchange="bulkSet(${i},'brand',this.value)"></div>
+ <div><label>Costo $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.costo||r.cost||'')}" onchange="bulkSet(${i},'cost',this.value)"></div>
+ <div><label>Margen</label><select onchange="bulkSetMark(${i},this.value)"><option value="50" ${+r.mark===50?'selected':''}>+50%</option><option value="100" ${+r.mark===100?'selected':''}>+100%</option><option value="0" ${+r.mark===0?'selected':''}>Manual</option></select></div>
+ <div><label>BCV $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.pbcv)}" onchange="bulkSetP(${i},'pbcv',this.value,'mB')"></div>
+ <div><label>CASH $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.pcash)}" onchange="bulkSetP(${i},'pcash',this.value,'mC')"></div>
+ <div><label>MercadoLibre $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.pml)}" onchange="bulkSetP(${i},'pml',this.value,'mM')"></div>
+ </div>
+ <div class="mu" style="margin-top:8px">Base ${money(r.base||0)}${RATE&&r.pbcv?' · BCV en Bs '+bsf((bnum(r.pbcv)||0)*RATE):''}${r.sub>0?' · Subtotal de la nota '+money(r.sub):''}</div></div>`;
+}
+function renderBulk(){
+ const b=$('#b_lote');if(!b)return;
+ const av=$('#b_av');
+ if(av)av.innerHTML=(BLK.ocr!=null?`<div class="mu" style="margin-top:8px;color:var(--wa)">⚠ La foto la leyó el lector automático. <b>Las cantidades y los costos siempre hay que revisarlos</b>: los números salen a veces cambiados.</div>`:'')
+  +(BLK.malas&&BLK.malas.length?`<div class="mu" style="margin-top:6px">${BLK.malas.length} línea(s) no se pudieron leer. Copia el texto y usa Analizar.</div>`:'');
+ if(!BLK.rows.length){b.innerHTML='<div class="mu" style="margin:14px 0">Todavía no hay artículos en el lote.</div>';return}
+ const tp=$('#b_tot');
+ if(tp)tp.textContent=BLK.rows.length+' artículos · '+bulkUnid()+' uds · costo '+money(bulkCosto());
+ b.innerHTML=`<div class="row" style="margin:14px 0 8px;gap:6px"><b>${BLK.rows.length} artículos</b>
+ <span style="flex:1"></span><button class="btn g s" onclick="bulkMarka(50)">Todos a +50%</button><button class="btn g s" onclick="bulkMarka(100)">Todos a +100%</button></div>
+ ${BLK.rows.map((r,i)=>bulkCard(r,i)).join('')}
+ <div class="row" style="margin:12px 0 0"><button class="btn g" onclick="closeM()">Cancelar</button>
+ <button class="btn" style="flex:1" onclick="bulkGuarda()">Guardar ${BLK.rows.length} artículos y la nota</button></div>`;
+}
+function bulkGuarda(){
+ const rs=BLK.rows.filter(r=>r.name&&bprecio(r.cost)>0);
+ if(!rs.length){alert('No hay artículos con descripción y costo. Revisa el lote.');return}
+ const malos=rs.filter(r=>bmal(r));
+ if(malos.length&&!confirm(malos.length+' artículo(s) tienen avisos de revisión. ¿Guardar de todos modos?'))return;
+ const d=1+difPct()/100;
+ const ps=rs.map((r,i)=>{const pbcv=bnum(r.pbcv)||0,pcash=bnum(r.pcash)||0;
+  return {id:uid(),ts:Date.now()-i,name:r.name.trim(),code:r.code.trim(),brand:(r.brand||'').trim(),
+   cost:bprecio(r.cost)||0,pbcv,pcash,price:pbcv,base:pbcv?Math.round((pbcv/d)*10000)/10000:'',
+   cman:0,pml:bnum(r.pml)||0,mman:0,stock:Math.max(0,parseInt(bnum(r.qty))||0),min:1,img:''}});
+ const gv=id=>{const e=$(id);return e?e.value.trim():''};
+ const meta={proveedor:gv('b_prov'),num:gv('b_num'),orden:gv('b_ord'),fecha:gv('b_fec'),
+  recibido:gv('b_rec'),credito:gv('b_pag'),vence:gv('b_pag')==='credito'?gv('b_cad'):'',
+  total:bnum(gv('b_tot_in'))||bulkCosto(),unidades:bulkUnid(),costo:bulkCosto(),
+  foto:BLK.meta.foto||'',confianza:BLK.ocr!=null?Math.round(BLK.ocr):null,
+  items:ps.map(p=>({id:p.id,code:p.code,name:p.name,brand:p.brand,qty:p.stock,cost:p.cost})),
+  ts:Date.now()};
+ const c={id:uid(),...meta};
+ if(!commit(ps,[],[c]))return;
+ db.parts=ps.concat(db.parts);
+ db.compras.unshift(c);
+ const n=ps.length;
+ BLK.rows=[];BLK.malas=[];BLK.meta={};BLK.ocr=null;
+ closeM();render();
+ alert('Guardados '+n+' artículos y la nota'+(meta.num?' N.º '+meta.num:'')+'.\n\nLos precios de venta los puede cambiar después, artículo por artículo.');
+}
+
+/* ---------- PESTANA COMPRAS ---------- */
+function diasVence(v){
+ if(!v)return null;
+ const a=esDoc(v);if(!a)return null;
+ const f=new Date(+a[1],+a[2]-1,+a[3]),h=new Date();h.setHours(0,0,0,0);
+ return Math.round((f-h)/864e5)}
+function renderCompras(){
+ const L=db.compras||[];
+ if(!L.length){$('#app').innerHTML='<div class="empty">Todavía no hay notas de compra.<br><br>Ve a Inventario y pulsa <b>📥 Carga rápida</b> para registrar la primera.</div>';return}
+ $('#app').innerHTML=`<div class="mu" style="margin-bottom:10px">${L.length} nota(s) registradas</div>`
+ +L.map(c=>{const d=c.credito==='credito'?diasVence(c.vence):null;
+  let est='';
+  if(d!=null&&d<0)est=`<span class="tag zero">Vencida hace ${-d} día(s)</span>`;
+  else if(d!=null&&d<=7)est=`<span class="tag low">Vence en ${d} día(s)</span>`;
+  else if(d!=null)est=`<span class="tag">Vence ${fmtFec(c.vence)}</span>`;
+  return `<div class="card" style="margin-bottom:10px;flex-direction:column;align-items:stretch;cursor:pointer" onclick="showCompra('${c.id}')">
+ <div class="row" style="margin:0;justify-content:space-between"><b>${esc(c.proveedor||'Sin proveedor')}${c.num?' · N.º '+esc(c.num):''}</b>
+ <b>${money(c.total||0)}</b></div>
+ <div class="mu">Nota ${fmtFec(c.fecha)} · recibida ${fmtFec(c.recibido)} · ${(c.items||[]).length} art · ${c.unidades||0} uds${c.credito==='credito'?' · A crédito':' · Contado'}</div>
+ <div style="margin-top:6px">${est}</div></div>`}).join('');
+}
+function showCompra(id){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ const d=c.credito==='credito'?diasVence(c.vence):null;
+ $('#box').innerHTML=`<div style="max-width:640px;margin:0 auto">
+ <h3 style="margin:0">Nota de compra ${c.num?'N.º '+esc(c.num):''}</h3>
+ <div class="mu" style="margin-top:4px">${esc(c.proveedor||'')}</div>
+ <div class="mu" style="margin-top:8px">Fecha de la nota: <b>${fmtFec(c.fecha)||'—'}</b><br>
+ Fecha de recepción: <b>${fmtFec(c.recibido)||'—'}</b><br>
+ Forma de pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>
+ ${c.credito==='credito'?`<br>Vence: <b>${fmtFec(c.vence)||'—'}</b> ${d!=null?(d<0?'<span style="color:var(--pr)">(vencida)':'(faltan '+d+' días)'):''}`:''}
+ <br>Total de la nota: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} artículos · ${c.unidades||0} unidades</div>
+ ${c.foto?`<img src="${c.foto}" style="width:100%;border-radius:10px;margin-top:12px;border:1px solid var(--bd)">`:''}
+ <div class="mu" style="margin-top:6px">${c.confianza!=null?'Confianza del lector automático: '+c.confianza+'%. Las cantidades y costos fueron revisados.':'Cargado sin lector automático.'}</div>
+ <div style="margin-top:12px;max-height:230px;overflow:auto"><table class="note" style="margin:0">
+ <tr><th>Código</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th></tr>
+ ${(c.items||[]).map(i=>`<tr><td>${esc(i.code||'')}</td><td>${esc(i.name)}</td><td class="r">${i.qty}</td><td class="r">${money(i.cost)}</td></tr>`).join('')}
+ </table></div>
+ <div class="row noprint" style="margin-top:14px"><button class="btn" onclick="verArt('${c.id}')">Ver en inventario</button>
+ <button class="btn g" onclick="descNota('${c.id}')">Ver la foto</button>
+ <button class="btn g" style="margin-left:auto;color:var(--danger)" onclick="delCompra('${c.id}')">Eliminar nota</button>
+ <button class="btn g" onclick="closeM()">Cerrar</button></div></div>`;
+ $('#modal').classList.add('on');
+}
+function verArt(id){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ closeM();view='inv';q='';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='inv'));
+ render();
+ const ids=(c.items||[]).map(i=>i.id);
+ setTimeout(()=>{const el=document.getElementById('q');if(el)el.value='';q='';
+  db.parts.forEach(p=>{if(ids.includes(p.id))p._nuevo=1});render()},50);
+}
+function descNota(id){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c||!c.foto)return alert('Esta nota no tiene foto guardada.');
+ const a=document.createElement('a');a.href=c.foto;a.download='nota-compra-'+(c.num||id);document.body.appendChild(a);a.click();a.remove();
+}
+function delCompra(id){
+ if(!confirm('¿Eliminar esta nota de compra?\n\nLos artículos que se crearon con ella NO se borran del inventario.'))return;
+ const n=(db.compras||[]).length;
+ db.compras=db.compras.filter(x=>x.id!==id);
+ if(R)R.doc('compras/'+id).delete().catch(se);else save();
+ closeM();renderCompras();
+}/* ---------- VENDER ---------- */
 function renderSell(){
  $('#app').innerHTML=`<div class="two"><div>${search()}<div id="list" class="grid" style="margin-top:10px;grid-template-columns:1fr">${sellList()}</div></div><div id="cartBox"></div></div>`;
  renderCart();
@@ -586,6 +898,10 @@ function sync(){
  watchNotes();
  R.doc('config/prices').onSnapshot(s=>{if(s.exists){SET={...SET,...s.data()};parUI();upd()}},()=>{});
  R.doc('config/logo').onSnapshot(s=>{LOGO=s.exists?{...s.data()}:null;upd()},()=>{});
+ R.collection('compras').onSnapshot(s=>{
+  db.compras=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+  if(view==='compras')renderCompras();
+ },()=>{});
 }
 </script>
 </body>
