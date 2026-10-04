@@ -13,7 +13,7 @@ setTimeout(function(){var b=document.getElementById('lbox');if(b&&/Cargando/.tes
 try{
 const V="https://www.gstatic.com/firebasejs/10.14.1/";
 const [A,B,C]=await Promise.all([import(V+"firebase-app.js"),import(V+"firebase-auth.js"),import(V+"firebase-firestore.js")]);
-const {initializeApp}=A,{getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut}=B;
+const {initializeApp}=A,{getAuth,onAuthStateChanged,signInWithEmailAndPassword,sendPasswordResetEmail,signOut}=B;
 const {initializeFirestore,getFirestore,persistentLocalCache,persistentMultipleTabManager,doc,getDoc,setDoc,deleteDoc,collection,onSnapshot,query,where}=C;
 const app=initializeApp({apiKey:"AIzaSyApwUjuKjIGM9E0JH8KGwqzu48lKEh3bZ8",authDomain:"gl-multitienda.firebaseapp.com",projectId:"gl-multitienda",storageBucket:"gl-multitienda.firebasestorage.app",messagingSenderId:"287997612371",appId:"1:287997612371:web:d7986a11e8b516676491a6"});
 const auth=getAuth(app);
@@ -22,6 +22,7 @@ const ds=s=>({exists:s.exists(),data:()=>s.data()});
 window.FB={
  onAuth:cb=>onAuthStateChanged(auth,cb),
  login:(e,p)=>signInWithEmailAndPassword(auth,e,p),
+ reset:(e,u)=>sendPasswordResetEmail(auth,e,u?{url:u}:undefined),
  logout:()=>signOut(auth),
  R:{
   doc:p=>({set:d=>setDoc(doc(fs,p),d),delete:()=>deleteDoc(doc(fs,p)),get:async()=>ds(await getDoc(doc(fs,p))),onSnapshot:(ok,er)=>onSnapshot(doc(fs,p),x=>ok(ds(x)),er)}),
@@ -525,9 +526,39 @@ function lockUI(msg){
  $('#lbox').innerHTML=`<h2 style="margin:0 0 4px">🔧 GL Multitienda</h2><div class="mu">Inicia sesión para continuar</div>
  <label>Correo</label><input id="l_u" type="email" autocomplete="username" autocapitalize="none">
  <label>Contraseña</label><input id="l_p" type="password" autocomplete="current-password">
- <div id="l_e" style="color:var(--danger);min-height:20px;margin:8px 0">${msg||''}</div><button class="btn" style="width:100%" onclick="doAuth()">Entrar</button>`;
+ <div id="l_e" style="color:var(--danger);min-height:20px;margin:8px 0">${msg||''}</div><button class="btn" style="width:100%" onclick="doAuth()">Entrar</button>
+  <div style="text-align:center;margin-top:14px"><a href="#" onclick="viewRecupera();return false" style="color:var(--acc);font-weight:600">¿Olvidaste tu contraseña?</a></div>`;
  $('#lock').style.display='flex';
  ['l_u','l_p'].forEach(i=>document.getElementById(i).addEventListener('keydown',ev=>{if(ev.key==='Enter')doAuth()}));
+}
+function viewRecupera(){
+ const correo=(($('#l_u')||{}).value||'').trim();
+ $('#lbox').innerHTML=`<h2 style="margin:0 0 4px">🔧 GL Multitienda</h2><div class="mu">Recuperar contraseña</div>
+  <div class="mu" style="margin-top:8px">Escribe el correo con el que te registraste y te enviamos un enlace para poner una contraseña nueva.</div>
+  <label>Correo</label><input id="r_u" type="email" autocomplete="username" autocapitalize="none" placeholder="tu@correo.com" value="${esc(correo)}">
+  <div id="l_e" style="color:var(--danger);min-height:20px;margin:8px 0"></div>
+  <button class="btn" style="width:100%" onclick="doReset()">Enviar correo de recuperación</button>
+  <div class="row" style="margin:10px 0 0;justify-content:center"><a href="#" onclick="lockUI();return false" style="color:var(--acc);font-weight:600">Volver al inicio de sesión</a></div>`;
+ $('#lock').style.display='flex';
+ document.getElementById('r_u').addEventListener('keydown',ev=>{if(ev.key==='Enter')doReset()});
+}
+async function doReset(){
+ const box=document.getElementById('l_e'),u=document.getElementById('r_u').value.trim();
+ box.textContent='';
+ if(!u||!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(u)){box.textContent='Escribe un correo válido';return}
+ try{
+  await FB.reset(u,location.origin+location.pathname);
+  $('#lbox').innerHTML=`<h2 style="margin:0 0 4px">🔧 GL Multitienda</h2>
+   <div style="font-size:19px;font-weight:700;color:var(--ok)">✓ Correo enviado</div>
+   <div class="mu" style="margin-top:8px">Si <b>${esc(u)}</b> está registrado, en unos minutos te llega un correo con un enlace para crear una contraseña nueva.<br><br>Revisa también la carpeta de correo no deseado o spam, porque a veces se cueda ahí.</div>
+   <button class="btn" style="width:100%;margin-top:14px" onclick="lockUI()">Volver al inicio de sesión</button>`;
+ }catch(x){
+  const c=(x&&x.code)||'';
+  box.textContent=/too-many-requests/i.test(c)?'Ya se enviaron demasiados correos. Espera unos minutos e inténtalo otra vez.'
+   :/invalid-email|missing-email/i.test(c)?'Ese correo no es válido.'
+   :/network-request-failed|network/i.test(c)?'Sin conexión. Revisa tu internet y prueba de nuevo.'
+   :'No se pudo enviar el correo. Inténtalo de nuevo en unos minutos.';
+ }
 }
 async function doAuth(){
  const e=$('#l_e');e.textContent='';
