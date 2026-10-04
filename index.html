@@ -331,6 +331,13 @@ function bprecio(t){
  let m=t.match(/^(\d{1,4})[\s.](\d{1,2})[-\s—–».,]*$/);
  if(m&&!t.includes('.'))return +m[1]+(+m[2]/Math.pow(10,m[2].length));
  return bnum(t)}
+function brow5(line){
+ const p=line.split('|').map(x=>String(x).trim()).filter(Boolean);
+ if(p.length<5)return null;
+ const r={code:p[0],brand:p[1],qty:bnum(p[2]),name:p.slice(3,p.length-1).join(' '),
+  cost:bprecio(p[p.length-1]),sub:'',mark:BLK.mark,pbcv:'',pcash:'',pml:'',base:'',mB:0,mC:0,mM:0,aviso:''};
+ if(!r.name||!(bnum(r.qty)>0||bprecio(r.cost)>0))return null;
+ bulkCalc(r);return r}
 function bsplit(l){for(const d of ['|','\t',';'])if(l.includes(d))return l.split(d);
  if(/\s{2,}/.test(l))return l.split(/\s{2,}/);
  return l.split(/\s+/)}
@@ -439,9 +446,9 @@ function openBulk(){
  <details style="margin-top:10px"><summary class="mu" style="cursor:pointer">Ver el texto que leyó de la foto</summary><pre id="b_raw" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:190px;overflow:auto;margin:8px 0 0"></pre></details>
  <div class="panel" style="padding:12px;margin-top:12px"><div class="row" style="margin:0 0 8px"><b>3. Pegar la lista</b></div>
  <div class="mu" style="margin-bottom:8px">Una línea por artículo, separando las columnas con <b>|</b>:<br>
- <code>código | cantidad | descripción | costo</code><br>
+ <code>código | marca | cantidad | descripción | costo</code><br>
  Ejemplo: <code>08412 | 1 | BOTON PUERTA VIDRIO TRAS. DER FOX | 4.88</code></div>
- <textarea id="b_txt" class="bta" spellcheck="false" placeholder="08412 | 1 | BOTON PUERTA VIDRIO TRAS. DER FOX | 4.88&#10;101000001AC | 24 | BUJIA GOL PARATI SAVEIRO (3PTS) | 2.90"></textarea>
+ <textarea id="b_txt" class="bta" spellcheck="false" placeholder="08412 | OSSCA | 1 | BOTON PUERTA VIDRIO TRAS. DER FOX | 4.88&#10;101000001AC | 24 | BUJIA GOL PARATI SAVEIRO (3PTS) | 2.90"></textarea>
  <div class="row" style="margin:10px 0 0;gap:6px"><button class="btn" onclick="bulkAnaliza(0)">Analizar la lista</button>
  <button class="btn g" onclick="bulkAnaliza(1)">Añadir</button><button class="btn g" onclick="bulkLimpia()">Vaciar artículos</button></div></div>
  <div id="b_av" class="mu" style="margin-top:10px"></div>
@@ -497,7 +504,8 @@ function bulkParse(txt){
   if(/^(total|subtotal|sub\s*total|iva|costo|importe|descuento|cant|cantidad|codigo|descripcion|marca)\b/i.test(t))return;
   if(/^(cliente|referencia|direccion|ciudad|sector|tel|vendedor|orden|bultos|page|fecha|vence|observa|entregado|despachado|recibido|pague|conserv|cambios|no\.|no:)\b/i.test(t))return;
   if(/pag[uo]|conserv|reglas especiales|entregado por|despachado por|recibido|observac/i.test(t))return;
-  const r=t.includes('|')?brow(t):browNota(t);
+  const np=t.includes('|')?t.split('|').length:0;
+  const r=np>=5?brow5(t):(np?brow(t):browNota(t));
   if(r&&r.name&&(bnum(r.qty)>0||bprecio(r.cost)>0))rs.push(r);
   else if(r&&r.name)malas.push(t);
  });
@@ -510,7 +518,7 @@ function bulkAnaliza(add){
  const t=$('#b_txt').value;
  if(!t.trim()){alert('Pega primero la lista');return}
  const p=bulkParse(t);
- if(!p.rows.length&&!p.malas.length){alert('No encontré artículos. Revisa que cada línea tenga código, cantidad, descripción y costo, separados por |.');return}
+ if(!p.rows.length&&!p.malas.length){alert('No encontré artículos. Revisa que cada línea tenga código, marca, cantidad, descripción y costo, separados por |.');return}
  BLK.rows=add?BLK.rows.concat(p.rows):p.rows;
  BLK.malas=add?(BLK.malas||[]).concat(p.malas):p.malas;
  BLK.page=0;renderBulk();
@@ -588,7 +596,7 @@ function bulkGuarda(){
   recibido:gv('b_rec'),credito:gv('b_pag'),vence:gv('b_pag')==='credito'?gv('b_cad'):'',
   total:bnum(gv('b_tot_in'))||bulkCosto(),unidades:bulkUnid(),costo:bulkCosto(),
   foto:BLK.meta.foto||'',confianza:BLK.ocr!=null?Math.round(BLK.ocr):null,
-  items:ps.map(p=>({id:p.id,code:p.code,name:p.name,brand:p.brand,qty:p.stock,cost:p.cost})),
+  items:ps.map(p=>({id:p.id,code:p.code,name:p.name,brand:p.brand,qty:p.stock,cost:p.cost,pbcv:p.pbcv,pcash:p.pcash,pml:p.pml})),
   ts:Date.now()};
  const c={id:uid(),...meta};
  if(!commit(ps,[],[c]))return;
@@ -640,7 +648,7 @@ function showCompra(id){
  </table></div>
  <div class="row noprint" style="margin-top:14px"><button class="btn" onclick="verArt('${c.id}')">Ver en inventario</button>
  <button class="btn g" onclick="descNota('${c.id}')">Ver la foto</button>
- <button class="btn g" style="margin-left:auto;color:var(--danger)" onclick="delCompra('${c.id}')">Eliminar nota</button>
+ <button class="btn g" onclick="delCompra('${c.id}',true)">Solo la nota</button><button class="btn g" style="margin-left:auto;color:var(--danger)" onclick="delCompra('${c.id}',false)">Eliminar nota y artículos</button>
  <button class="btn g" onclick="closeM()">Cerrar</button></div></div>`;
  $('#modal').classList.add('on');
 }
@@ -656,13 +664,51 @@ function descNota(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c||!c.foto)return alert('Esta nota no tiene foto guardada.');
  const a=document.createElement('a');a.href=c.foto;a.download='nota-compra-'+(c.num||id);document.body.appendChild(a);a.click();a.remove();
 }
-function delCompra(id){
- if(!confirm('¿Eliminar esta nota de compra?\n\nLos artículos que se crearon con ella NO se borran del inventario.'))return;
- const n=(db.compras||[]).length;
+function delCompra(id,soloNota){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ const arts=c.items||[];
+ if(soloNota){
+  if(!confirm('¿Eliminar solo esta nota de compra?\n\nLos '+arts.length+' artículo(s) que se crearon con ella seguirán en el inventario.'))return;
+  db.compras=db.compras.filter(x=>x.id!==id);
+  if(R)R.doc('compras/'+id).delete().catch(se);
+  closeM();render();
+  alert('Nota eliminada. Los artículos siguen en el inventario.');
+  return;
+ }
+ if(!arts.length){
+  if(!confirm('¿Eliminar esta nota de compra?'))return;
+  db.compras=db.compras.filter(x=>x.id!==id);
+  if(R)R.doc('compras/'+id).delete().catch(se);
+  closeM();render();alert('Nota eliminada.');
+  return;
+ }
+ const cambiados=[],identicos=[];
+ arts.forEach(it=>{
+  const p=db.parts.find(x=>x.id===it.id);
+  if(!p)return;
+  const d=[];
+  if(p.cost!==it.cost)d.push('el costo');
+  if(p.stock!==it.qty)d.push('el stock');
+  if(it.pbcv!=null&&p.pbcv!==it.pbcv)d.push('el precio BCV');
+  if(it.pcash!=null&&p.pcash!==it.pcash)d.push('el precio CASH');
+  if(it.pml!=null&&p.pml!==it.pml)d.push('el precio de MercadoLibre');
+  if(d.length)cambiados.push({p:p,que:d});else identicos.push(p);
+ });
+ let msg='¿Eliminar la nota'+(c.num?' N.º '+c.num:'')+'?\n\nSe borrarán del inventario '+arts.length+' artículo(s).';
+ if(cambiados.length)msg+='\n\nOjo: '+cambiados.length+' ya los modificaste ('+cambiados.slice(0,3).map(x=>x.p.name).join(', ')+(cambiados.length>3?'…':'')+'). Si los borro, pierdes esos cambios.';
+ if(!confirm(msg))return;
+ let borrados=0;const conservados=[];
+ identicos.forEach(p=>{borrados++;if(R)R.doc('parts/'+p.id).delete().catch(se)});
+ db.parts=db.parts.filter(p=>!identicos.some(x=>x.id===p.id));
  db.compras=db.compras.filter(x=>x.id!==id);
- if(R)R.doc('compras/'+id).delete().catch(se);else save();
- closeM();renderCompras();
-}/* ---------- VENDER ---------- */
+ if(R)R.doc('compras/'+id).delete().catch(se);
+ if(!R)save();
+ closeM();render();
+ let fin='Nota eliminada'+(borrados?' y '+borrados+' artículo(s) borrados del inventario.':'.');
+ if(cambiados.length)fin+='\n\nSe conservaron '+cambiados.length+' que habías modificado:\n\n'+cambiados.map(x=>'• '+x.p.name+' — cambiaste '+x.que.join(' y ')).join('\n');
+ alert(fin);
+}
+/* ---------- VENDER ---------- */
 function renderSell(){
  $('#app').innerHTML=`<div class="two"><div>${search()}<div id="list" class="grid" style="margin-top:10px;grid-template-columns:1fr">${sellList()}</div></div><div id="cartBox"></div></div>`;
  renderCart();
