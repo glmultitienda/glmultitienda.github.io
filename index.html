@@ -386,7 +386,7 @@ function bulkCalc(r){
 function bdec(r){const n=bnum(r.cost)||0;
  return (Number.isInteger(n)&&n>=11&&n%100>0)?Math.floor(n/100)+(n%100)/100:0}
 function bulkFix(i){const r=BLK.rows[i];const v=bdec(r);if(!v)return;
- r.cost=v;if(bnum(r.qty)===1||!bnum(r.qty))r.sub=v;r.mB=1;bulkCalc(r);renderBulk()}
+ r.cost=v;if(bnum(r.qty)===1||!bnum(r.qty))r.sub=v;r.mB=1;bulkCalc(r);bulkPinta(i)}
 function bdup(r){
  const k=nz(r.code),n=nz(r.name);
  return db.parts.find(p=>(k&&nz(p.code||'')===k)||(n&&nz(p.name||'')===n))||null}
@@ -437,6 +437,13 @@ function openBulk(){
  </div></div>
 
  <details style="margin-top:10px"><summary class="mu" style="cursor:pointer">Ver el texto que leyó de la foto</summary><pre id="b_raw" style="white-space:pre-wrap;background:var(--bg);padding:10px;border-radius:8px;font-size:12px;max-height:190px;overflow:auto;margin:8px 0 0"></pre></details>
+ <div class="panel" style="padding:12px;margin-top:12px"><div class="row" style="margin:0 0 8px"><b>3. Pegar la lista</b></div>
+ <div class="mu" style="margin-bottom:8px">Una línea por artículo, separando las columnas con <b>|</b>:<br>
+ <code>código | cantidad | descripción | costo</code><br>
+ Ejemplo: <code>08412 | 1 | BOTON PUERTA VIDRIO TRAS. DER FOX | 4.88</code></div>
+ <textarea id="b_txt" class="bta" spellcheck="false" placeholder="08412 | 1 | BOTON PUERTA VIDRIO TRAS. DER FOX | 4.88&#10;101000001AC | 24 | BUJIA GOL PARATI SAVEIRO (3PTS) | 2.90"></textarea>
+ <div class="row" style="margin:10px 0 0;gap:6px"><button class="btn" onclick="bulkAnaliza(0)">Analizar la lista</button>
+ <button class="btn g" onclick="bulkAnaliza(1)">Añadir</button><button class="btn g" onclick="bulkLimpia()">Vaciar artículos</button></div></div>
  <div id="b_av" class="mu" style="margin-top:10px"></div>
  <div id="b_lote"></div></div>`;
  $('#modal').classList.add('on');renderBulk();
@@ -482,7 +489,7 @@ function bCab(txt){
  if(/a\s*cr[eé]dito/i.test(txt))o.credito=true;
  m=/^\s*Total\b[^:\n]*:?\s*([\d.,]+)/im.exec(txt);if(m&&!/sub/i.test(m[0]))o.total=m[1];
  return o}
-function bulkAnalizaTxt(txt){
+function bulkParse(txt){
  const rs=[];const malas=[];
  txt.split(/\r?\n/).forEach(l=>{
   const t=l.trim();if(!t)return;
@@ -490,38 +497,68 @@ function bulkAnalizaTxt(txt){
   if(/^(total|subtotal|sub\s*total|iva|costo|importe|descuento|cant|cantidad|codigo|descripcion|marca)\b/i.test(t))return;
   if(/^(cliente|referencia|direccion|ciudad|sector|tel|vendedor|orden|bultos|page|fecha|vence|observa|entregado|despachado|recibido|pague|conserv|cambios|no\.|no:)\b/i.test(t))return;
   if(/pag[uo]|conserv|reglas especiales|entregado por|despachado por|recibido|observac/i.test(t))return;
-  const r=browNota(t);
+  const r=t.includes('|')?brow(t):browNota(t);
   if(r&&r.name&&(bnum(r.qty)>0||bprecio(r.cost)>0))rs.push(r);
   else if(r&&r.name)malas.push(t);
  });
- BLK.rows=rs;BLK.page=0;
- BLK.malas=malas;renderBulk();
- return rs}
+ return {rows:rs,malas:malas}}
+function bulkAnalizaTxt(txt){
+ const p=bulkParse(txt);
+ BLK.rows=p.rows;BLK.malas=p.malas;BLK.page=0;renderBulk();
+ return p.rows}
+function bulkAnaliza(add){
+ const t=$('#b_txt').value;
+ if(!t.trim()){alert('Pega primero la lista');return}
+ const p=bulkParse(t);
+ if(!p.rows.length&&!p.malas.length){alert('No encontré artículos. Revisa que cada línea tenga código, cantidad, descripción y costo, separados por |.');return}
+ BLK.rows=add?BLK.rows.concat(p.rows):p.rows;
+ BLK.malas=add?(BLK.malas||[]).concat(p.malas):p.malas;
+ BLK.page=0;renderBulk();
+}
 function bulkLimpia(){BLK.rows=[];BLK.malas=[];renderBulk()}
-function bulkSet(i,f,v){BLK.rows[i][f]=v;bulkCalc(BLK.rows[i]);renderBulk()}
-function bulkSetMark(i,v){const r=BLK.rows[i];r.mark=+v;r.mB=r.mC=r.mM=0;bulkCalc(r);renderBulk()}
-function bulkSetP(i,f,v,fl){const r=BLK.rows[i];r[f]=v;r[fl]=1;bulkCalc(r);renderBulk()}
-function bulkMarka(m){BLK.rows.forEach(r=>{r.mark=m;r.mB=r.mC=r.mM=0;bulkCalc(r)});renderBulk()}
+function bulkRm(i){if(!BLK.rows[i])return;BLK.rows.splice(i,1);renderBulk()}
+function bulkSet(i,f,v){const r=BLK.rows[i];r[f]=v;bulkCalc(r);bulkPinta(i)}
+function bulkSetMark(i,v){const r=BLK.rows[i];r.mark=+v;r.mB=r.mC=r.mM=0;bulkCalc(r);bulkPinta(i)}
+function bulkSetP(i,f,v,fl){const r=BLK.rows[i];r[f]=v;r[fl]=1;bulkCalc(r);bulkPinta(i)}
+function bulkMarka(m){BLK.rows.forEach((r,i)=>{r.mark=m;r.mB=r.mC=r.mM=0;bulkCalc(r)});BLK.rows.forEach((r,i)=>bulkPinta(i))}
+function bulkAviso(r){
+ const d=bdup(r),w=bmal(r),sug=bdec(r);let h='';
+ if(d)h+='<span class="tag low">ya existe</span>';
+ if(w)h+=`<span class="tag" style="background:var(--wa)">${esc(w)}</span>`;
+ if(sug)h+=`<button class="btn g s" onclick="bulkFix(${window.__bi})" title="El lector probablemente juntó los decimales">⚠ ¿era ${money(sug)}? corregí</button>`;
+ return h}
+function bulkPie(r){
+ return 'Base '+money(r.base||0)+(RATE&&r.pbcv?' · BCV en Bs '+bsf((bnum(r.pbcv)||0)*RATE):'')+(r.sub>0?' · Subtotal de la nota '+money(r.sub):'')}
+function bulkPinta(i){
+ const r=BLK.rows[i];if(!r)return;
+ window.__bi=i;
+ const v=(id,x)=>{const e=document.getElementById(id);if(e&&document.activeElement!==e)e.value=(x==null?'':String(x))};
+ v('bpB'+i,r.pbcv);v('bpC'+i,r.pcash);v('bpM'+i,r.pml);
+ const w=document.getElementById('bw'+i);if(w)w.innerHTML=bulkAviso(r);
+ const c=document.getElementById('bc'+i);if(c)c.style.borderColor=bmal(r)?'var(--wa)':'var(--bd)';
+ const p=document.getElementById('bf'+i);if(p)p.textContent=bulkPie(r);
+ const cv=document.getElementById('bco'+i);if(cv&&document.activeElement!==cv)cv.value=r.costo||'';
+}
 function bulkCard(r,i){
- const d=bdup(r),w=bmal(r),sug=bdec(r);
- return `<div class="panel" style="margin:0 0 10px;padding:12px;${w?'border-color:var(--wa)':''}">
+ const d=bdup(r),w=bmal(r);
+ return `<div class="panel" id="bc${i}" style="margin:0 0 10px;padding:12px;${w?'border-color:var(--wa)':''}">
  <div class="row" style="margin:0 0 8px;gap:6px"><b style="color:var(--acc)">#${i+1}</b>
- ${d?`<span class="tag low">ya existe</span>`:''}${w?`<span class="tag" style="background:var(--wa)">${esc(w)}</span>`:''}
- ${sug?`<button class="btn g s" onclick="bulkFix(${i})" title="El lector probablemente juntó los decimales">⚠ ¿era ${money(sug)}? corregí</button>`:''}
+ <span id="bw${i}" style="display:contents"></span>
  <span style="flex:1"></span><button class="btn g s" onclick="bulkRm(${i})">Quitar</button></div>
  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
  <div><label>Código</label><input value="${esc(r.code)}" onchange="bulkSet(${i},'code',this.value)"></div>
  <div><label>Cantidad</label><input type="number" step="1" inputmode="numeric" value="${esc(r.qty)}" onchange="bulkSet(${i},'qty',this.value)"></div>
  <div style="grid-column:1/-1"><label>Descripción</label><input value="${esc(r.name)}" onchange="bulkSet(${i},'name',this.value)"></div>
  <div><label>Marca</label><input value="${esc(r.brand||'')}" onchange="bulkSet(${i},'brand',this.value)"></div>
- <div><label>Costo $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.costo||r.cost||'')}" onchange="bulkSet(${i},'cost',this.value)"></div>
+ <div><label>Costo $</label><input id="bco${i}" type="number" step="0.01" inputmode="decimal" value="${esc(r.costo||'')}" onchange="bulkSet(${i},'cost',this.value)"></div>
  <div><label>Margen</label><select onchange="bulkSetMark(${i},this.value)"><option value="50" ${+r.mark===50?'selected':''}>+50%</option><option value="100" ${+r.mark===100?'selected':''}>+100%</option><option value="0" ${+r.mark===0?'selected':''}>Manual</option></select></div>
- <div><label>BCV $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.pbcv)}" onchange="bulkSetP(${i},'pbcv',this.value,'mB')"></div>
- <div><label>CASH $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.pcash)}" onchange="bulkSetP(${i},'pcash',this.value,'mC')"></div>
- <div><label>MercadoLibre $</label><input type="number" step="0.01" inputmode="decimal" value="${esc(r.pml)}" onchange="bulkSetP(${i},'pml',this.value,'mM')"></div>
+ <div><label>BCV $</label><input id="bpB${i}" type="number" step="0.01" inputmode="decimal" value="${esc(r.pbcv)}" onchange="bulkSetP(${i},'pbcv',this.value,'mB')"></div>
+ <div><label>CASH $</label><input id="bpC${i}" type="number" step="0.01" inputmode="decimal" value="${esc(r.pcash)}" onchange="bulkSetP(${i},'pcash',this.value,'mC')"></div>
+ <div><label>MercadoLibre $</label><input id="bpM${i}" type="number" step="0.01" inputmode="decimal" value="${esc(r.pml)}" onchange="bulkSetP(${i},'pml',this.value,'mM')"></div>
  </div>
- <div class="mu" style="margin-top:8px">Base ${money(r.base||0)}${RATE&&r.pbcv?' · BCV en Bs '+bsf((bnum(r.pbcv)||0)*RATE):''}${r.sub>0?' · Subtotal de la nota '+money(r.sub):''}</div></div>`;
+ <div class="mu" id="bf${i}" style="margin-top:8px">${bulkPie(r)}</div></div>`;
 }
+function bulkPintarTodo(){BLK.rows.forEach((r,i)=>bulkPinta(i))}
 function renderBulk(){
  const b=$('#b_lote');if(!b)return;
  const av=$('#b_av');
