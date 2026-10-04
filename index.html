@@ -616,16 +616,19 @@ function diasVence(v){
  return Math.round((f-h)/864e5)}
 function renderCompras(){
  const L=db.compras||[];
+ const anul=L.filter(c=>c.anulado).length;
  if(!L.length){$('#app').innerHTML='<div class="empty">Todavía no hay notas de compra.<br><br>Ve a Inventario y pulsa <b>📥 Carga rápida</b> para registrar la primera.</div>';return}
- $('#app').innerHTML=`<div class="mu" style="margin-bottom:10px">${L.length} nota(s) registradas</div>`
+ $('#app').innerHTML=`<div class="row" style="margin:0 0 10px"><span class="mu">${L.length} nota(s)${anul?' · '+anul+' anulada(s)':''}</span>
+ <span style="flex:1"></span>${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgaAnuladas()">🗑 Borrar las ${anul} anuladas</button>`:''}</div>`
  +L.map(c=>{const d=c.credito==='credito'?diasVence(c.vence):null;
   let est='';
   if(d!=null&&d<0)est=`<span class="tag zero">Vencida hace ${-d} día(s)</span>`;
   else if(d!=null&&d<=7)est=`<span class="tag low">Vence en ${d} día(s)</span>`;
   else if(d!=null)est=`<span class="tag">Vence ${fmtFec(c.vence)}</span>`;
-  return `<div class="card" style="margin-bottom:10px;flex-direction:column;align-items:stretch;cursor:pointer" onclick="showCompra('${c.id}')">
- <div class="row" style="margin:0;justify-content:space-between"><b>${esc(c.proveedor||'Sin proveedor')}${c.num?' · N.º '+esc(c.num):''}</b>
- <b>${money(c.total||0)}</b></div>
+  if(c.anulado)est=`<span class="tag zero">ANULADA</span>`+est;
+  return `<div class="card" style="margin-bottom:10px;flex-direction:column;align-items:stretch;cursor:pointer;${c.anulado?'opacity:.7':''}" onclick="showCompra('${c.id}')">
+ <div class="row" style="margin:0;justify-content:space-between"><b style="${c.anulado?'text-decoration:line-through':''}">${esc(c.proveedor||'Sin proveedor')}${c.num?' · N.º '+esc(c.num):''}</b>
+ <b style="${c.anulado?'text-decoration:line-through;color:var(--danger)':''}">${money(c.total||0)}</b></div>
  <div class="mu">Nota ${fmtFec(c.fecha)} · recibida ${fmtFec(c.recibido)} · ${(c.items||[]).length} art · ${c.unidades||0} uds${c.credito==='credito'?' · A crédito':' · Contado'}</div>
  <div style="margin-top:6px">${est}</div></div>`}).join('');
 }
@@ -633,79 +636,87 @@ function showCompra(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  const d=c.credito==='credito'?diasVence(c.vence):null;
  $('#box').innerHTML=`<div style="max-width:640px;margin:0 auto">
- <h3 style="margin:0">Nota de compra ${c.num?'N.º '+esc(c.num):''}</h3>
+ <h3 style="margin:0">Nota de compra ${c.num?'N.º '+esc(c.num):''}${c.anulado?' <span style="color:var(--danger);font-size:14px">· ANULADA</span>':''}</h3>
  <div class="mu" style="margin-top:4px">${esc(c.proveedor||'')}</div>
  <div class="mu" style="margin-top:8px">Fecha de la nota: <b>${fmtFec(c.fecha)||'—'}</b><br>
  Fecha de recepción: <b>${fmtFec(c.recibido)||'—'}</b><br>
  Forma de pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>
  ${c.credito==='credito'?`<br>Vence: <b>${fmtFec(c.vence)||'—'}</b> ${d!=null?(d<0?'<span style="color:var(--pr)">(vencida)':'(faltan '+d+' días)'):''}`:''}
  <br>Total de la nota: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} artículos · ${c.unidades||0} unidades</div>
+ ${c.anulado&&c.anuladoDate?`<div class="mu" style="color:var(--danger)">Anulada el ${fmtFec(c.anuladoDate)}</div>`:''}
  ${c.foto?`<img src="${c.foto}" style="width:100%;border-radius:10px;margin-top:12px;border:1px solid var(--bd)">`:''}
  <div class="mu" style="margin-top:6px">${c.confianza!=null?'Confianza del lector automático: '+c.confianza+'%. Las cantidades y costos fueron revisados.':'Cargado sin lector automático.'}</div>
  <div style="margin-top:12px;max-height:230px;overflow:auto"><table class="note" style="margin:0">
  <tr><th>Código</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th></tr>
  ${(c.items||[]).map(i=>`<tr><td>${esc(i.code||'')}</td><td>${esc(i.name)}</td><td class="r">${i.qty}</td><td class="r">${money(i.cost)}</td></tr>`).join('')}
  </table></div>
- <div class="row noprint" style="margin-top:14px"><button class="btn" onclick="verArt('${c.id}')">Ver en inventario</button>
- <button class="btn g" onclick="descNota('${c.id}')">Ver la foto</button>
- <button class="btn g" onclick="delCompra('${c.id}',true)">Solo la nota</button><button class="btn g" style="margin-left:auto;color:var(--danger)" onclick="delCompra('${c.id}',false)">Eliminar nota y artículos</button>
- <button class="btn g" onclick="closeM()">Cerrar</button></div></div>`;
+ <div class="row noprint" style="margin-top:14px">
+ ${c.anulado?`<button class="btn g" onclick="anularCompra('${c.id}',false)">↩ Reactivar nota</button>`
+   :`<button class="btn g" style="color:var(--danger)" onclick="anularCompra('${c.id}',true)">⊘ Anular nota</button>`}
+ <button class="btn g" onclick="verArt('${c.id}')">Ver artículos</button>
+ ${c.foto?`<button class="btn g" onclick="descNota('${c.id}')">Ver la foto</button>`:''}
+ <span style="flex:1"></span>
+ <button class="btn g" onclick="delCompra('${c.id}',true)">Solo la nota</button>
+ <button class="btn" style="background:var(--danger)" onclick="delCompra('${c.id}',false)">Nota + artículos</button></div>
+ <div class="mu" style="margin-top:6px">Anular deja la nota marcada pero sus artículos siguen en el inventario. Borrar la quita de la lista; "Nota + artículos" borra también lo que creó.</div></div>`;
  $('#modal').classList.add('on');
 }
-function verArt(id){
+function anularCompra(id,on){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
- closeM();view='inv';q='';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='inv'));
- render();
- const ids=(c.items||[]).map(i=>i.id);
- setTimeout(()=>{const el=document.getElementById('q');if(el)el.value='';q='';
-  db.parts.forEach(p=>{if(ids.includes(p.id))p._nuevo=1});render()},50);
+ if(on&&!confirm('¿Anular la nota'+(c.num?' N.º '+c.num:'')+'?\n\nQueda marcada como ANULADA, pero sus artículos siguen en el inventario y la nota no se borra.\n\nPodrás borrarla después si quieres.'))return;
+ c.anulado=!!on;c.anuladoDate=on?new Date().toISOString():null;
+ if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
+ closeM();renderCompras();
+ if(!on)alert('Nota reactivada.');
 }
-function descNota(id){
- const c=(db.compras||[]).find(x=>x.id===id);if(!c||!c.foto)return alert('Esta nota no tiene foto guardada.');
- const a=document.createElement('a');a.href=c.foto;a.download='nota-compra-'+(c.num||id);document.body.appendChild(a);a.click();a.remove();
+function borraNotas(lista,borrarArts){
+ let borrados=0;const conservados=[];
+ lista.forEach(c=>{
+  const arts=c.items||[];
+  if(borrarArts){
+   const identicos=[],cambiados=[];
+   arts.forEach(it=>{
+    const p=db.parts.find(x=>x.id===it.id);if(!p)return;
+    const d=[];
+    if(p.cost!==it.cost)d.push('el costo');
+    if(p.stock!==it.qty)d.push('el stock');
+    if(it.pbcv!=null&&p.pbcv!==it.pbcv)d.push('el precio BCV');
+    if(it.pcash!=null&&p.pcash!==it.pcash)d.push('el precio CASH');
+    if(it.pml!=null&&p.pml!==it.pml)d.push('el precio de MercadoLibre');
+    if(d.length)cambiados.push({p:p,que:d});else identicos.push(p);
+   });
+   identicos.forEach(p=>{borrados++;if(R)R.doc('parts/'+p.id).delete().catch(se)});
+   db.parts=db.parts.filter(p=>!identicos.some(x=>x.id===p.id));
+   cambiados.forEach(x=>conservados.push(x.p.name+' (cambiaste '+x.que.join(' y ')+')'));
+  }
+  db.compras=db.compras.filter(x=>x.id!==c.id);
+  if(R)R.doc('compras/'+c.id).delete().catch(se);
+ });
+ if(!R)save();
+ return {borrados:borrados,conservados:conservados};
 }
 function delCompra(id,soloNota){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  const arts=c.items||[];
- if(soloNota){
-  if(!confirm('¿Eliminar solo esta nota de compra?\n\nLos '+arts.length+' artículo(s) que se crearon con ella seguirán en el inventario.'))return;
-  db.compras=db.compras.filter(x=>x.id!==id);
-  if(R)R.doc('compras/'+id).delete().catch(se);
-  closeM();render();
-  alert('Nota eliminada. Los artículos siguen en el inventario.');
-  return;
+ if(!soloNota&&arts.length){
+  const conf=confirm('¿Eliminar la nota'+(c.num?' N.º '+c.num:'')+'?\n\nSe borrarán del inventario '+arts.length+' artículo(s) que creó.\n\nLos que ya hayas modificado se conservan.');
+  if(!conf)return;
  }
- if(!arts.length){
-  if(!confirm('¿Eliminar esta nota de compra?'))return;
-  db.compras=db.compras.filter(x=>x.id!==id);
-  if(R)R.doc('compras/'+id).delete().catch(se);
-  closeM();render();alert('Nota eliminada.');
-  return;
- }
- const cambiados=[],identicos=[];
- arts.forEach(it=>{
-  const p=db.parts.find(x=>x.id===it.id);
-  if(!p)return;
-  const d=[];
-  if(p.cost!==it.cost)d.push('el costo');
-  if(p.stock!==it.qty)d.push('el stock');
-  if(it.pbcv!=null&&p.pbcv!==it.pbcv)d.push('el precio BCV');
-  if(it.pcash!=null&&p.pcash!==it.pcash)d.push('el precio CASH');
-  if(it.pml!=null&&p.pml!==it.pml)d.push('el precio de MercadoLibre');
-  if(d.length)cambiados.push({p:p,que:d});else identicos.push(p);
- });
- let msg='¿Eliminar la nota'+(c.num?' N.º '+c.num:'')+'?\n\nSe borrarán del inventario '+arts.length+' artículo(s).';
- if(cambiados.length)msg+='\n\nOjo: '+cambiados.length+' ya los modificaste ('+cambiados.slice(0,3).map(x=>x.p.name).join(', ')+(cambiados.length>3?'…':'')+'). Si los borro, pierdes esos cambios.';
- if(!confirm(msg))return;
- let borrados=0;const conservados=[];
- identicos.forEach(p=>{borrados++;if(R)R.doc('parts/'+p.id).delete().catch(se)});
- db.parts=db.parts.filter(p=>!identicos.some(x=>x.id===p.id));
- db.compras=db.compras.filter(x=>x.id!==id);
- if(R)R.doc('compras/'+id).delete().catch(se);
- if(!R)save();
+ const r=borraNotas([c],!soloNota);
  closeM();render();
- let fin='Nota eliminada'+(borrados?' y '+borrados+' artículo(s) borrados del inventario.':'.');
- if(cambiados.length)fin+='\n\nSe conservaron '+cambiados.length+' que habías modificado:\n\n'+cambiados.map(x=>'• '+x.p.name+' — cambiaste '+x.que.join(' y ')).join('\n');
+ let fin='Nota eliminada'+(r.borrados?' y '+r.borrados+' artículo(s) borrados del inventario.':'.');
+ if(r.conservados.length)fin+='\n\nSe conservaron '+r.conservados.length+' que habías modificado:\n\n'+r.conservados.map(x=>'• '+x).join('\n');
+ alert(fin);
+}
+function purgaAnuladas(){
+ const L=(db.compras||[]).filter(c=>c.anulado);
+ if(!L.length)return alert('No hay notas anuladas.');
+ const arts=L.reduce((a,c)=>a+(c.items||[]).length,0);
+ if(!confirm('Vas a borrar '+L.length+' nota(s) anuladas'+(arts?' y sus '+arts+' artículo(s)':'')+'.\n\nLos artículos que hayas modificado se conservan.\n\n¿Continuar?'))return;
+ const r=borraNotas(L,true);
+ closeM();render();
+ let fin=L.length+' nota(s) anuladas borradas'+(r.borrados?' y '+r.borrados+' artículo(s) del inventario.':'')+'.';
+ if(r.conservados.length)fin+='\n\nSe conservaron '+r.conservados.length+' artículos que habías modificado:\n\n'+r.conservados.map(x=>'• '+x).join('\n');
  alert(fin);
 }
 /* ---------- VENDER ---------- */
