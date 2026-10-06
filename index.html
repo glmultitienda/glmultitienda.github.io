@@ -100,7 +100,7 @@ header .btn.s{min-height:34px;padding:6px 10px}main{padding:12px 12px 24px}}
 <nav><button data-v="inv" class="on">Inventario</button><button data-v="sell">Vender</button><button data-v="notes">Notas</button><button data-v="compras">Compras</button><button data-v="cli">Clientes</button><button data-v="rep">Reportes</button></nav>
 </header>
 <main id="app"></main>
-<div id="lock"><div class="box" id="lbox" style="max-width:380px"><h2 style="margin:0">🔧 GL Multitienda</h2><p class="mu">Cargando… (v13)</p></div></div>
+<div id="lock"><div class="box" id="lbox" style="max-width:380px"><h2 style="margin:0">🔧 GL Multitienda</h2><p class="mu">Cargando… (v14 · 06/10/2026)</p></div></div>
 <div id="modal"><div class="box" id="box"></div></div>
 
 <script>
@@ -1059,9 +1059,9 @@ function sync(){
  const upd=()=>{cart=cart.filter(c=>find(c.id));const m=$('#modal').classList.contains('on'),a=document.activeElement;if(!m&&!(a&&a.tagName==='INPUT'))render();else refreshList()};
  R.collection('parts').onSnapshot(s=>{
   db.parts=s.docs.map(d=>({ts:0,...d.data()})).sort((a,b)=>b.ts-a.ts);
-  $('#st').textContent='☁ Sincronizado';
+  $('#st').textContent='☁ Sincronizado · v14';
   if(!mig){mig=true;if(s.empty&&LOC.parts.length&&confirm('Se encontraron '+LOC.parts.length+' repuestos guardados en este dispositivo. ¿Subirlos a la nube para sincronizarlos?'))commit(LOC.parts.map((p,i)=>({ts:Date.now()-i,...p})),LOC.notes)}
-  upd()},()=>{$('#st').textContent='Error de sincronización'});
+  upd()},()=>{$('#st').textContent='Error de sincronización · v14'});
  let unN=null;const cut=new Date(Date.now()-60*864e5).toISOString();
  const watchNotes=()=>{if(unN)unN();unN=R.collection('notes',notesAll?null:['date','>=',cut]).onSnapshot(s=>{
   db.notes=s.docs.map(d=>({...d.data()})).sort((a,b)=>b.no-a.no);
