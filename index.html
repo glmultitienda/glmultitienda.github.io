@@ -999,7 +999,8 @@ async function pdfNote(no,share){
   }
   y+=8;f(1);d.setFontSize(12);t(165,'TOTAL',{align:'right'});t(R2,money(n.total),{align:'right'});
   if(n.bs>0){y+=6;t(165,'TOTAL Bs',{align:'right'});t(R2,'Bs '+bsf(n.bs),{align:'right'});}
-  if(y>230){d.addPage();y=20}
+     if(y>230){d.addPage();y=20}
+     const blob=d.output('blob'),fn='Nota-de-entrega-'+pad+'.pdf';
   if(share){const f=new File([blob],fn,{type:'application/pdf'});
    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:'Nota de entrega '+pad});return}catch(e){if(e&&e.name==='AbortError')return}}
    waText(n)}
