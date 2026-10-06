@@ -361,23 +361,9 @@ function panelDatos(){
 function marcasHTML(){
  const L=(DATOS.marcas||[]).filter(m=>m&&m.img);
  if(!L.length)return '';
- return '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;justify-content:flex-end;flex:1">'
- +L.map(m=>`<img src="${m.img}" title="${esc(m.nombre||'')}" style="max-height:40px;max-width:88px;object-fit:contain">`).join('')
- +'</div>';
-}
-function marcasPDF(d,L,R2,y,f,t){
- if(!DATOS.marcas.length)return y;
- y+=10;f();d.setFontSize(8);d.setTextColor(110);t(L,'MARCAS QUE MANEJAMOS',{align:'center'});
- d.setTextColor(0);f();
- const hs=13;let total=0;
- DATOS.marcas.forEach(m=>{const w=Math.min(hs*1.6,hs*(m.w||1));total+=w+7});
- let x=L+(R2-L-total)/2;
- DATOS.marcas.forEach(m=>{
-  const w=Math.min(hs*1.6,hs*(m.w||1));
-  try{d.addImage(m.img,m.img.startsWith('data:image/png')?'PNG':'JPEG',x,y,w,hs)}catch(e){}
-  x+=w+7;
- });
- return y+hs+3;
+ return '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;justify-content:flex-end">'
+  +L.map(m=>`<img src="${m.img}" title="${esc(m.nombre||'')}" style="height:62px;width:auto;max-width:120px;object-fit:contain">`).join('')
+  +'</div>';
 }
 
 /* ---------- NOTAS DE COMPRA / CARGA RAPIDA ---------- */
@@ -856,13 +842,13 @@ function purgaNotasAnuladas(){
 }
 function showNote(no){
  const n=db.notes.find(x=>x.no===no);
- $('#box').innerHTML=`<div class="note"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:2px">GL Multitienda</h2><div style="font-size:12px;max-width:330px;line-height:1.3">${datoV('frase')}</div><div style="font-size:12px;margin-top:5px;color:#333">Tel: ${datoV('telefono')} &nbsp;·&nbsp; ${datoV('email')}</div></div>${LOGO?`<img src="${LOGO.img}" style="max-height:70px;max-width:40%">`:''}${marcasHTML()}</div>
+ $('#box').innerHTML=`<div class="note"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h2 style="margin-bottom:2px">GL Multitienda</h2><div style="font-size:12px;max-width:330px;line-height:1.3">${datoV('frase')}</div><div style="font-size:12px;margin-top:5px;color:#333">Tel: ${datoV('telefono')} &nbsp;·&nbsp; ${datoV('email')}</div></div>${LOGO?`<img src="${LOGO.img}" style="height:62px;width:auto;max-width:150px;object-fit:contain;flex:none">`:''}${marcasHTML()}</div>
  <h3 style="margin:12px 0 4px">NOTA DE ENTREGA N.º ${String(n.no).padStart(5,'0')}</h3>${n.void?'<div style="color:#b91c1c;font-weight:700">⚠ NOTA ANULADA</div>':''}
  <div style="font-size:14px">Fecha: ${new Date(n.date).toLocaleString('es')}<br>Cliente: <b>${esc(n.client)}</b>${n.ci?'<br>Cédula: '+esc(n.ci):''}${n.phone?'<br>Tel: '+esc(n.phone):''}${n.pay?'<br>Pago: '+esc(n.pay)+(n.tier?' · Precio '+(n.tier==='bcv'?'$ BCV':'$ CASH'):''):''}</div>
  <div style="overflow-x:auto"><table><tr><th>Cant.</th><th>Descripción</th><th class="r">P. unit.</th><th class="r">Importe</th></tr>
  ${n.items.map(i=>`<tr><td>${i.qty}</td><td>${esc(i.name)}<br><small>${esc(i.code)}</small></td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
  <tr><td colspan="3" class="r"><b>TOTAL</b></td><td class="r"><b>${money(n.total)}</b></td></tr>${n.bs>0?`<tr><td colspan="3" class="r"><b>TOTAL Bs</b></td><td class="r"><b>Bs ${bsf(n.bs)}</b></td></tr>`:''}</table></div>
-  <div class="sig"><div>Entregado por</div><div>Recibido por</div></div></div>
+</div>
   <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">⬇ Descargar PDF</button><button class="btn" style="background:#16a34a" onclick="pdfNote(${n.no},true)">WhatsApp</button><button class="btn g" onclick="window.print()">🖨 Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" style="color:var(--danger)" onclick="voidNote(${n.no})">Anular nota</button>`}<button class="btn g" onclick="closeM()">Cerrar</button><button class="btn g" style="color:var(--danger)" onclick="delNota(${n.no})">Borrar nota</button></div>`;
  $('#modal').classList.add('on');
 }
@@ -985,11 +971,16 @@ async function pdfNote(no,share){
   if(!window.jspdf){await dl.save({filename:'Nota-'+pad+'.html',data:'<!doctype html><meta charset="utf-8"><title>Nota '+pad+'</title><body style="font-family:sans-serif;max-width:700px;margin:auto">'+$('.note').outerHTML+'</body>'});return}
   const d=new window.jspdf.jsPDF({unit:'mm',format:'letter'}),L=15,R2=200;let y=20;
   const t=(x,s,o)=>d.text(String(s),x,y,o),f=b=>d.setFont('helvetica',b?'bold':'normal');
-  if(LOGO){let h=22,w=h*LOGO.w/LOGO.h;if(w>60){w=60;h=w*LOGO.h/LOGO.w}d.addImage(LOGO.img,LOGO.img.startsWith('data:image/png')?'PNG':'JPEG',R2-w,12,w,h)}
-   const MB=(DATOS.marcas||[]).filter(m=>m&&m.img);let mx=R2-(LOGO?60:0)-8;
-   for(let i=MB.length-1;i>=0;i--){const m=MB[i],h=15,w=Math.min(h*2.2,h*((m.w||1)||1.2));
-    try{d.addImage(m.img,m.img.startsWith('data:image/png')?'PNG':'JPEG',mx-w,12+(22-h)/2,w,h)}catch(e){}
-    mx-=w+6;}
+  const HH=20,WB=52;let mx=R2;
+  const MB=(DATOS.marcas||[]).filter(m=>m&&m.img);
+  if(LOGO){let h=HH,w=h*(LOGO.w/LOGO.h);if(w>WB){w=WB;h=w*(LOGO.h/LOGO.w)}
+   if(MB.length)mx-=(WB+8);
+   try{d.addImage(LOGO.img,LOGO.img.startsWith('data:image/png')?'PNG':'JPEG',mx-w,12,w,h)}catch(e){}
+   mx-=w+8;}
+  for(let i=MB.length-1;i>=0;i--){
+   const m=MB[i];let h=HH,w=h*((m.w||1.3)/1.3);if(w>WB){w=WB;h=w*1.3/((m.w||1.3)/1.3)}
+   try{d.addImage(m.img,m.img.startsWith('data:image/png')?'PNG':'JPEG',mx-w,12,w,h)}catch(e){}
+   mx-=w+7;}
   f(1);d.setFontSize(20);t(L,'GL Multitienda');y+=6;f();d.setFontSize(9);const fr=d.splitTextToSize(' '+DATOS.frase,150);fr.forEach(q=>{t(L,q.trim());y+=4});y+=1;d.setFontSize(9);t(L,'Tel: '+(DATOS.telefono||'')+(DATOS.email?'  ·  '+DATOS.email:''));y+=4;
   y+=11;f(1);d.setFontSize(13);t(L,'NOTA DE ENTREGA N.º '+pad);
   y+=7;f();d.setFontSize(10);t(L,'Fecha: '+new Date(n.date).toLocaleString('es'));
@@ -1009,8 +1000,6 @@ async function pdfNote(no,share){
   y+=8;f(1);d.setFontSize(12);t(165,'TOTAL',{align:'right'});t(R2,money(n.total),{align:'right'});
   if(n.bs>0){y+=6;t(165,'TOTAL Bs',{align:'right'});t(R2,'Bs '+bsf(n.bs),{align:'right'});}
   if(y>230){d.addPage();y=20}
-  y+=35;d.setDrawColor(0);d.line(L,y,80,y);d.line(120,y,R2,y);y+=5;f();d.setFontSize(10);t(47,'Entregado por',{align:'center'});t(160,'Recibido por',{align:'center'});
-  const blob=d.output('blob'),fn='Nota-de-entrega-'+pad+'.pdf';
   if(share){const f=new File([blob],fn,{type:'application/pdf'});
    if(navigator.canShare&&navigator.canShare({files:[f]})){try{await navigator.share({files:[f],title:'Nota de entrega '+pad});return}catch(e){if(e&&e.name==='AbortError')return}}
    waText(n)}
