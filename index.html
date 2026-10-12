@@ -92,7 +92,7 @@ header .btn.s{min-height:34px;padding:6px 10px}main{padding:12px 12px 24px}}
 <header>
 <button class="btn s" style="position:absolute;right:12px;top:12px;background:rgba(255,255,255,.2)" onclick="logout()">Salir 🔒</button>
 <h1>🔧 GL Multitienda <small>· Inventario</small></h1><small id="st" style="display:block;font-size:12px;opacity:.9">Conectando…</small>
-<div class="row" style="margin:6px 0 0;gap:6px"><button id="rateBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openCalc()">🧮 Tasa</button><button id="parBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openSet()">📈 Paralelo</button></div>
+<div class="row" style="margin:6px 0 0;gap:6px"><button id="rateBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openCalc()">🧮 Tasa</button><button id="parBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openSet()">📈 Paralelo</button><button id="themeBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="toggleTheme()">🌙 Modo noche</button></div>
 <nav><button data-v="inv" class="on">Inventario</button><button data-v="compras">Compras</button><button data-v="sell">Vender</button><button data-v="notes">Notas</button><button data-v="cli">Clientes</button><button data-v="rep">Reportes</button></nav>
 </header>
 <main id="app"></main>
@@ -100,7 +100,7 @@ header .btn.s{min-height:34px;padding:6px 10px}main{padding:12px 12px 24px}}
 <div id="modal"><div class="box" id="box"></div></div>
 
 <script>
-let LOGO=null,CL=[],db={parts:[],notes:[],compras:[]},R=null,mig=false,view='inv',q='',cart=[],client={name:'',phone:'',ci:''};
+let LOGO=null,CL=[],db={parts:[],notes:[],compras:[]},R=null,mig=false,view='inv',q='',cart=[],client={name:'',phone:'',ci:''},mlFil='all';
 let USER=null,synced=false,payMethod='Efectivo',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum'};
 const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro'];
 const ADMINS=[]; // correos con acceso a costos y ganancias (vacío = todos)
@@ -226,12 +226,16 @@ function pr(p,t){if(t==='ml')return p.pml??mlPrice(pr(p,'cash'));return t==='cas
 function ganTxt(c,a,b){if(!isAdmin()||!(+c>0))return '';const g=v=>money(v-c)+' ('+Math.round((v-c)/c*100)+'%)';return 'Ganancia BCV: '+g(+b||0)+' · CASH: '+g(+a||0)}
 function ganPrev(){const bs=document.getElementById('f_bs'),pb=document.getElementById('f_pbcv'),ml=document.getElementById('f_ml'),pm=document.getElementById('f_pml');if(bs&&pb)bs.textContent=bsTxt(pb.value);if(ml&&pm)ml.textContent=mlTxt(pm.value);const e=document.getElementById('f_gan'),c=document.getElementById('f_cost');if(e&&c)e.textContent=ganTxt(c.value,document.getElementById('f_pcash').value,document.getElementById('f_pbcv').value)}
 function setTier(v){payTier=v;cart.forEach(c=>{const p=find(c.id);if(p)c.price=pr(p,v)});renderCart()}
-function fl(p){return invF==='all'||(invF==='01'&&p.stock<=1)||(invF==='0'&&p.stock<=0)||(invF==='1'&&p.stock===1)}
+function fl(p){return (invF==='all'||(invF==='01'&&p.stock<=1)||(invF==='0'&&p.stock<=0)||(invF==='1'&&p.stock===1))&&(mlFil==='all'||(mlFil==='pub'&&p.mlpub)||(mlFil==='nopub'&&!p.mlpub))}
 function setF(k){invF=k;renderInv()}
+function setMlF(k){mlFil=k;renderInv()}
+function setMlPub(id,on){const p=find(id);if(!p)return;p.mlpub=!!on;commit([p])}
 function chips(){
  const c0=db.parts.filter(p=>p.stock<=0).length,c1=db.parts.filter(p=>p.stock===1).length;
+ const cp=db.parts.filter(p=>p.mlpub).length,cn=db.parts.length-cp;
  const b=(k,l)=>`<button class="btn s ${invF===k?'':'g'}" onclick="setF('${k}')">${l}</button>`;
- return `<div class="row">${b('all','Todos')}${b('01','En 0 y 1 ('+(c0+c1)+')')}${b('0','Solo 0 ('+c0+')')}${b('1','Solo 1 ('+c1+')')}${invF!=='all'?'<button class="btn s" style="background:#16a34a" onclick="waFilter()">WhatsApp</button>':''}</div>`;
+ const m=(k,l)=>`<button class="btn s ${mlFil===k?'':'g'}" onclick="setMlF('${k}')">${l}</button>`;
+ return `<div class="row">${b('all','Todos')}${b('01','En 0 y 1 ('+(c0+c1)+')')}${b('0','Solo 0 ('+c0+')')}${b('1','Solo 1 ('+c1+')')}<span style="flex:1"></span>${m('all','ML: todos')}${m('pub','🌐 Publicados ('+cp+')')}${m('nopub','⚠ Sin publicar ('+cn+')')}${invF!=='all'?'<button class="btn s" style="background:#16a34a" onclick="waFilter()">WhatsApp</button>':''}</div>`;
 }
 function waFilter(){
  const l=ranked().filter(fl).sort((a,b)=>a.stock-b.stock);
@@ -262,7 +266,7 @@ function invList(){
  const l=ranked().filter(fl).sort((a,b)=>invF==='all'?0:a.stock-b.stock);
  if(!l.length)return '<div class="empty" style="grid-column:1/-1">Sin repuestos. Toca “+ Nuevo repuesto”.</div>';
  return l.map(p=>`<div class="card">${pic(p)}<div class="i"><b>${esc(p.name)}</b><div class="mu">${[esc(p.code),esc(p.brand)].filter(Boolean).join(' · ')}</div><div class="pr2"><b style="color:#16a34a">BCV ${money(pr(p,'bcv'))}</b><b>CASH ${money(pr(p,'cash'))}</b></div>${RATE?`<div class="mu">Bs ${bsf(pr(p,'bcv')*RATE)} (BCV)</div>`:''}<div class="mu">MercadoLibre ${money(pr(p,'ml'))}</div><div>${tag(p)}</div>${isAdmin()?`<div class="mu">Costo ${money(p.cost)} · Gan. BCV ${money(pr(p,'bcv')-(p.cost||0))} · CASH ${money(pr(p,'cash')-(p.cost||0))}</div>`:''}
- <div class="acts"><button class="btn s g" onclick="editPart('${p.id}')">Editar</button><button class="btn s g" onclick="addStock('${p.id}')">+ Entrada</button></div></div></div>`).join('');
+ <div class="acts"><button class="btn s g" onclick="editPart('${p.id}')">Editar</button><button class="btn s g" onclick="addStock('${p.id}')">+ Entrada</button><label class="btn s g" style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;user-select:none"><input type="checkbox" ${p.mlpub?'checked':''} onchange="setMlPub('${p.id}',this.checked)" style="width:auto;min-height:0;padding:0;margin:0"> 🌐 Publicado en ML</label></div></div></div>`).join('');
 }
 function editPart(id){
  const p=id?find(id):{name:'',code:'',brand:'',cost:'',price:'',stock:0,min:1,img:''};
@@ -765,6 +769,24 @@ async function pdfNote(no,share){
 }
 render();
 
+function setTheme(t){
+ if(t==='dark'||t==='light')document.documentElement.dataset.theme=t;
+ else document.documentElement.removeAttribute('data-theme');
+ try{localStorage.setItem('glm_theme',t)}catch(e){}
+ themeUI();
+}
+function themeUI(){
+ const b=$('#themeBtn');if(!b)return;
+ const t=document.documentElement.dataset.theme;
+ const dark=t==='dark'||(!t&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+ b.textContent=dark?'☀️ Modo día':'🌙 Modo noche';
+}
+function toggleTheme(){
+ const t=document.documentElement.dataset.theme;
+ const dark=t==='dark'||(!t&&window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches);
+ setTheme(dark?'light':'dark');
+}
+
 function lockUI(msg){
  $('#lbox').innerHTML=`<h2 style="margin:0 0 4px">🔧 GL Multitienda</h2><div class="mu">Inicia sesión para continuar</div>
  <label>Correo</label><input id="l_u" type="email" autocomplete="username" autocapitalize="none">
@@ -781,6 +803,8 @@ async function doAuth(){
 function logout(){FB.logout().then(()=>location.reload())}
 function boot(){FB.onAuth(u=>{if(u){USER=u;R=FB.R;$('#lock').style.display='none';if(!synced){synced=true;sync()}}else{R=null;lockUI()}})}
 loadSet();loadRate();fetchRate();setInterval(()=>fetchRate(),30*60*1000);
+try{const th=localStorage.getItem('glm_theme')||'auto';if(th==='dark'||th==='light')document.documentElement.dataset.theme=th}catch(e){}
+themeUI();
 window.FB?boot():window.addEventListener('fbready',boot);
 function sync(){
  const upd=()=>{cart=cart.filter(c=>find(c.id));const m=$('#modal').classList.contains('on'),a=document.activeElement;if(!m&&!(a&&a.tagName==='INPUT'))render();else refreshList()};
