@@ -354,7 +354,13 @@ function checkout(){
 /* ---------- CARGA RÁPIDA Y COMPRAS ---------- */
 let BLK={rows:[],malas:[],foto:null,prov:'',num:'',credito:'contado',vence:''};
 function dISO(off){const d=new Date();d.setDate(d.getDate()+(off||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-function fFec(x){const d=x?new Date(x):null;return d&&!isNaN(d)?d.toLocaleDateString('es'):'—'}
+function fFec(x){
+ if(!x)return '—';
+ const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(x));
+ if(m){const d=new Date(+m[1],+m[2]-1,+m[3]);return d.toLocaleDateString('es')}
+ const d=new Date(x);
+ return d&&!isNaN(d)?d.toLocaleDateString('es'):'—';
+}
 function diasVence(v){const d=new Date(String(v||'').slice(0,10)+'T00:00:00');if(isNaN(d))return null;const n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5)}
 function bnum(s){let t=String(s==null?'':s).trim().replace(/[^\d.,-]/g,'');if(!t)return NaN;
  if(t.includes(',')){t=t.replace(/\./g,'').replace(',','.')}
@@ -487,21 +493,28 @@ function bulkGuarda(){
 }
 function editCompra(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ const isCred=c.credito==='credito';
  $('#box').innerHTML=`<h3 style="margin:0">✏️ Datos de la compra</h3>
  <div class="mu" style="margin:4px 0 8px">${(c.items||[]).length} artículos · ${c.unidades||0} uds · ${money(c.total||0)}</div>
  <label>Empresa / Proveedor</label><input id="e_prov" value="${esc(c.prov||'')}">
  <label>N.º de factura</label><input id="e_num" value="${esc(c.num||'')}">
  <div style="display:flex;gap:8px"><div style="flex:1"><label>Fecha de emisión</label><input id="e_fecha" type="date" value="${(c.fecha||'').slice(0,10)}"></div><div style="flex:1"><label>Fecha de recepción</label><input id="e_rec" type="date" value="${(c.recibido||'').slice(0,10)}"></div></div>
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Forma de pago</label><select id="e_cred" onchange="eCred(this.value)"><option value="contado" ${isCred?'':'selected'}>Contado</option><option value="credito" ${isCred?'selected':''}>A crédito</option></select></div><div style="flex:1" id="e_venceBox"><label>Vencimiento</label><input id="e_vence" type="date" value="${(c.vence||'').slice(0,10)||dISO(30)}"></div></div>
  <div class="row" style="margin-top:14px"><button class="btn" onclick="saveCompraData('${c.id}')">💾 Guardar</button><button class="btn g" onclick="showCompra('${c.id}')">Cancelar</button></div>`;
  $('#modal').classList.add('on');
+ eCred(isCred?'credito':'contado');
 }
+function eCred(v){const b=$('#e_venceBox');if(b)b.style.display=v==='credito'?'block':'none'}
 function saveCompraData(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  c.prov=$('#e_prov').value.trim()||'Sin proveedor';
  c.num=$('#e_num').value.trim();
- const fe=$('#e_fecha'),rc=$('#e_rec');
+ const fe=$('#e_fecha'),rc=$('#e_rec'),cr=$('#e_cred'),vn=$('#e_vence');
  if(fe&&fe.value)c.fecha=fe.value;
  if(rc&&rc.value)c.recibido=rc.value;
+ if(cr)c.credito=cr.value;
+ if(cr&&cr.value==='credito'&&vn&&vn.value)c.vence=vn.value;
+ if(cr&&cr.value!=='credito')c.vence=null;
  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
  showCompra(id);renderCompras();
 }
