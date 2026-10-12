@@ -93,14 +93,14 @@ header .btn.s{min-height:34px;padding:6px 10px}main{padding:12px 12px 24px}}
 <button class="btn s" style="position:absolute;right:12px;top:12px;background:rgba(255,255,255,.2)" onclick="logout()">Salir 🔒</button>
 <h1>🔧 GL Multitienda <small>· Inventario</small></h1><small id="st" style="display:block;font-size:12px;opacity:.9">Conectando…</small>
 <div class="row" style="margin:6px 0 0;gap:6px"><button id="rateBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openCalc()">🧮 Tasa</button><button id="parBtn" class="btn s" style="background:rgba(255,255,255,.2)" onclick="openSet()">📈 Paralelo</button></div>
-<nav><button data-v="inv" class="on">Inventario</button><button data-v="sell">Vender</button><button data-v="notes">Notas</button><button data-v="cli">Clientes</button><button data-v="rep">Reportes</button></nav>
+<nav><button data-v="inv" class="on">Inventario</button><button data-v="compras">Compras</button><button data-v="sell">Vender</button><button data-v="notes">Notas</button><button data-v="cli">Clientes</button><button data-v="rep">Reportes</button></nav>
 </header>
 <main id="app"></main>
-<div id="lock"><div class="box" id="lbox" style="max-width:380px"><h2 style="margin:0">🔧 GL Multitienda</h2><p class="mu">Cargando… (v13)</p></div></div>
+<div id="lock"><div class="box" id="lbox" style="max-width:380px"><h2 style="margin:0">🔧 GL Multitienda</h2><p class="mu">Cargando… (v14 · 12/10/2026)</p></div></div>
 <div id="modal"><div class="box" id="box"></div></div>
 
 <script>
-let LOGO=null,CL=[],db={parts:[],notes:[]},R=null,mig=false,view='inv',q='',cart=[],client={name:'',phone:'',ci:''};
+let LOGO=null,CL=[],db={parts:[],notes:[],compras:[]},R=null,mig=false,view='inv',q='',cart=[],client={name:'',phone:'',ci:''};
 let USER=null,synced=false,payMethod='Efectivo',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum'};
 const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro'];
 const ADMINS=[]; // correos con acceso a costos y ganancias (vacío = todos)
@@ -125,7 +125,7 @@ const pic=p=>p.img?`<img src="${p.img}" alt="" style="cursor:zoom-in" onclick="z
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{view=b.dataset.v;q='';document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));render()});
 
 function render(){
- if(view==='inv')renderInv();else if(view==='sell')renderSell();else if(view==='cli')renderCli();else if(view==='rep')renderRep();else renderNotes();
+ if(view==='inv')renderInv();else if(view==='compras')renderCompras();else if(view==='sell')renderSell();else if(view==='cli')renderCli();else if(view==='rep')renderRep();else renderNotes();
 }
 function search(ph='Buscar por nombre, código o marca…'){return `<input id="q" type="search" autocomplete="off" placeholder="${ph}" value="${esc(q)}" oninput="q=this.value;refreshList()">`}
 function bsf(n){return (+n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}
@@ -250,7 +250,7 @@ function refreshList(){const el=$('#list');if(!el)return;el.innerHTML=view==='in
 /* ---------- INVENTARIO ---------- */
 function renderInv(){
  const val=db.parts.reduce((a,p)=>a+p.stock*pr(p,'bcv'),0),valh=db.parts.reduce((a,p)=>a+p.stock*pr(p,'cash'),0),valc=db.parts.reduce((a,p)=>a+p.stock*(p.cost||0),0);
- $('#app').innerHTML=`<div class="row">${search()}<button class="btn" onclick="editPart()">+ Nuevo repuesto</button></div>
+ $('#app').innerHTML=`<div class="row">${search()}<button class="btn" onclick="editPart()">+ Nuevo repuesto</button><button class="btn" style="background:#16a34a" onclick="openBulk()">📥 Carga rápida</button></div>
  <div class="mu" style="margin-bottom:8px">${db.parts.length} repuestos · ${isAdmin()?'Invertido (costo): '+money(valc)+' · ':''}Venta BCV: ${money(val)} · Venta CASH: ${money(valh)}</div>
  ${chips()}
  <div id="list" class="grid">${invList()}</div>
@@ -349,6 +349,169 @@ function checkout(){
  const n={no:Math.max(SEQ,0,...db.notes.map(x=>x.no))+1,date:new Date().toISOString(),client:client.name.trim()||'Cliente general',phone:client.phone,ci:(client.ci||'').trim(),pay:payMethod,tier:payTier,rate:RATE||0,bs:bsNow(),items,total:total()};
  db.notes.unshift(n);SEQ=n.no;if(R)R.doc('config/seq').set({n:SEQ}).catch(se);if(!commit(cart.map(c=>find(c.id)),[n]))return;
  cart=[];client={name:'',phone:'',ci:''};bsMan=null;renderSell();showNote(n.no);
+}
+
+/* ---------- CARGA RÁPIDA Y COMPRAS ---------- */
+let BLK={rows:[],malas:[],foto:null,prov:'',num:'',credito:'contado',vence:''};
+function fFec(x){const d=x?new Date(x):null;return d&&!isNaN(d)?d.toLocaleDateString('es'):'—'}
+function diasVence(v){const d=new Date(String(v||'').slice(0,10)+'T00:00:00');if(isNaN(d))return null;const n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5)}
+function bnum(s){let t=String(s==null?'':s).trim().replace(/[^\d.,-]/g,'');if(!t)return NaN;
+ if(t.includes(',')){t=t.replace(/\./g,'').replace(',','.')}
+ else{const m=/^(\d+)\.(\d{1,2})$/.exec(t);if(m)t=m[1]+'.'+m[2];else t=t.replace(/\./g,'')}
+ return +t}
+function comprimeImg(file,maxPx,q){return new Promise(res=>{const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,maxPx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q||.8))};im.src=rd.result};rd.onerror=()=>res(null);rd.readAsDataURL(file)})}
+function openBulk(){
+ BLK={rows:[],malas:[],foto:null,prov:'',num:'',credito:'contado',vence:new Date().toISOString().slice(0,10)};
+ $('#box').innerHTML=`<h3 style="margin:0">📥 Carga rápida de mercancía</h3>
+ <div class="mu" style="margin:4px 0 10px">Pega el texto de la nota de compra o adjunta la foto (queda como respaldo). Formato por línea: <b>código | marca | cantidad | descripción | precio</b> — separado por |, TAB, ; o espacios. Ejemplo: <b>CT846 | CONTINENTAL | 2 | Correa De Tiempo | 12.81</b></div>
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Proveedor</label><input id="b_prov" placeholder="Nombre del proveedor"></div><div style="flex:1"><label>N.º de nota (opcional)</label><input id="b_num" placeholder="Factura / nota"></div></div>
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Forma de pago</label><select id="b_cred" onchange="blCred(this.value)"><option value="contado">Contado</option><option value="credito">A crédito</option></select></div><div style="flex:1" id="b_venceBox"><label>Vence</label><input id="b_vence" type="date" value="${BLK.vence}"></div></div>
+ <label>Texto de la nota</label><textarea id="b_txt" rows="6" placeholder="codigo|marca|cantidad|descripcion|precio&#10;Ej: 6Q0-199-555AS|STAR PARTS|1|Base De Caja Izquierda Vw Fox|22.22" style="font-family:ui-monospace,Consolas,monospace;font-size:13px"></textarea>
+ <label>Foto de la nota (opcional)</label><input type="file" accept="image/*" onchange="blFoto(this)">
+ <div id="b_prev" style="margin-top:10px"></div>
+ <div class="row" style="margin-top:14px"><button class="btn" onclick="bulkAnaliza()">🔍 Analizar texto</button><button class="btn" style="background:#16a34a;display:none" onclick="bulkGuarda()" id="b_save">💾 Guardar compra</button><button class="btn g" onclick="bulkLimpia()">Limpiar</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
+ $('#modal').classList.add('on');
+ blCred('contado');
+}
+function blCred(v){BLK.credito=v;const b=$('#b_venceBox');if(b)b.style.display=v==='credito'?'block':'none'}
+async function blFoto(inp){const f=inp.files&&inp.files[0];if(!f)return;const d=await comprimeImg(f,1200,.85);if(d){BLK.foto=d;$('#b_prev').innerHTML=`<img src="${d}" style="max-height:160px;border-radius:10px;border:1px solid var(--bd)"> <span class="mu">Foto adjunta ✔</span>`}else alert('No se pudo leer la imagen.')}
+function blSplit(line){let f=line.split('\t');if(f.length<2)f=line.split('|');if(f.length<2)f=line.split(';');if(f.length<2)f=line.trim().split(/\s{2,}/);if(f.length<2)f=line.trim().split(/\s+/);return f.map(s=>s.trim()).filter(Boolean)}
+function blIsNum(s){return /^\d{1,4}([.,]\d{1,2})?$/.test(String(s||'').trim())}
+function blParseLine(line){
+  const f=blSplit(line);
+  if(f.length<4)return null;
+  const cost=bnum(f[f.length-1]);
+  if(!(cost>0))return null;
+  const code=f[0];
+  let brand='',name,qty;
+  if(f.length>=5){
+    if(blIsNum(f[2])){
+      // Formato A: código | marca | cantidad | descripción... | precio
+      qty=parseInt(f[2],10);brand=f[1];name=f.slice(3,f.length-1).join(' ');
+    }else{
+      // Formato B: código | marca | descripción... | cantidad | precio
+      qty=parseInt(f[f.length-2],10);brand=f[1];name=f.slice(2,f.length-2).join(' ');
+    }
+  }else{
+    // 4 columnas
+    if(blIsNum(f[1])){qty=parseInt(f[1],10);name=f[2]}                       // código | cantidad | descripción | precio
+    else if(blIsNum(f[2])){qty=parseInt(f[2],10);name=f[1]}                   // código | descripción | cantidad | precio
+    else return null;
+  }
+  if(!(qty>0)||!name)return null;
+  return{code,brand,name,qty,cost};
+}
+function bulkAnaliza(){
+ const txt=$('#b_txt').value||'';
+ BLK.prov=$('#b_prov').value.trim();BLK.num=$('#b_num').value.trim();
+ const ve=$('#b_vence');if(ve)BLK.vence=ve.value;
+ BLK.rows=[];BLK.malas=[];
+ txt.split(/\r?\n/).forEach((ln,i)=>{const t=ln.trim();if(!t)return;
+  if(i===0&&/c[oó]digo|c[oó]d/i.test(t)&&isNaN(bnum(t)))return;
+  const r=blParseLine(t);if(r)BLK.rows.push(r);else BLK.malas.push(t)});
+ if(!BLK.rows.length&&!BLK.malas.length){alert('Pega primero el texto de la nota.');return}
+ renderBulk();
+}
+function bulkCalc(r){r.total=Math.round(r.qty*r.cost*100)/100}
+function bulkUnid(){return BLK.rows.reduce((a,r)=>a+r.qty,0)}
+function bulkCosto(){return BLK.rows.reduce((a,r)=>a+r.qty*r.cost,0)}
+function renderBulk(){
+ BLK.rows.forEach(bulkCalc);
+ const sv=$('#b_save');if(sv)sv.style.display=BLK.rows.length?'inline-flex':'none';
+ $('#b_prev').innerHTML=(BLK.foto?`<img src="${BLK.foto}" style="max-height:130px;border-radius:10px;border:1px solid var(--bd)">`:'')+
+ `<table class="note" style="margin-top:10px;background:var(--card);color:var(--tx)"><tr><th></th><th>Código</th><th>Marca</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th><th class="r">Total</th></tr>
+ ${BLK.rows.map((r,i)=>`<tr><td><button class="btn g s" onclick="bulkRm(${i})">✕</button></td><td>${esc(r.code)}</td><td>${esc(r.brand)}</td><td>${esc(r.name)}</td>
+ <td class="r"><input type="number" min="1" step="1" value="${r.qty}" style="width:70px;padding:6px" oninput="bulkSet(${i},'qty',this.value)"></td>
+ <td class="r"><input type="number" min="0" step="0.01" value="${r.cost}" style="width:90px;padding:6px" oninput="bulkSet(${i},'cost',this.value)"></td>
+ <td class="r" id="bt${i}">${money(r.total)}</td></tr>`).join('')}
+ <tr><td colspan="4" class="r"><b>Totales</b></td><td class="r"><b>${bulkUnid()}</b></td><td></td><td class="r"><b>${money(bulkCosto())}</b></td></tr></table>
+ ${BLK.malas.length?`<div class="mu" style="margin-top:8px">⚠ ${BLK.malas.length} línea(s) no entendida(s) (revisa el formato):</div><div class="mu" style="white-space:pre-wrap;background:var(--panel);padding:8px;border-radius:8px">${esc(BLK.malas.join('\n'))}</div>`:''}`;
+}
+function bulkSet(i,f,v){const r=BLK.rows[i];if(!r)return;if(f==='qty')r.qty=Math.max(1,parseInt(v)||1);else r.cost=Math.max(0,bnum(v)||0);bulkCalc(r);const c=$('#bt'+i);if(c)c.textContent=money(r.total)}
+function bulkRm(i){BLK.rows.splice(i,1);renderBulk()}
+function bulkLimpia(){BLK.rows=[];BLK.malas=[];const t=$('#b_txt');if(t)t.value='';const p=$('#b_prev');if(p)p.innerHTML='';const s=$('#b_save');if(s)s.style.display='none'}
+function bulkGuarda(){
+ if(!BLK.rows.length){alert('No hay filas para guardar.');return}
+ const id=uid(),ps=[];
+ const items=BLK.rows.map(r=>{
+  const code=r.code.toUpperCase();
+  let p=db.parts.find(x=>(x.code||'').toUpperCase()===code);
+  if(p){p.stock+=r.qty;p.cost=r.cost;if(!ps.includes(p))ps.push(p)}
+  else{
+   const base=Math.round(r.cost*2*10000)/10000;
+   const pbcv=Math.round(base*(1+difPct()/100)*100)/100;
+   const pcash=cashOf(pbcv);
+   p={id:uid(),ts:Date.now(),name:r.name,code,brand:r.brand||'',cost:r.cost,base,cman:false,pbcv,price:pbcv,pcash,pml:Math.round(mlPrice(pcash)*100)/100,mman:false,stock:r.qty,min:1,img:''};
+   db.parts.unshift(p);if(!ps.includes(p))ps.push(p);
+  }
+  return{id:p.id,code,brand:r.brand||'',name:r.name,qty:r.qty,cost:r.cost};
+ });
+ const total=Math.round(items.reduce((a,i)=>a+i.qty*i.cost,0)*100)/100;
+ const c={id,ts:Date.now(),prov:BLK.prov||'Sin proveedor',num:BLK.num,fecha:new Date().toISOString().slice(0,10),recibido:new Date().toISOString().slice(0,10),credito:BLK.credito,vence:BLK.credito==='credito'?BLK.vence:null,items,total,unidades:bulkUnid(),foto:BLK.foto||null,anulado:false,anuladoDate:null};
+ db.compras.unshift(c);
+ if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);
+ commit(ps);
+ closeM();view='compras';q='';
+ document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='compras'));
+ renderCompras();
+ alert('Compra guardada: '+items.length+' artículos, '+bulkUnid()+' uds, '+money(total)+'.\nEl inventario se actualizó.');
+}
+function renderCompras(){
+ const L=db.compras||[];
+ const anul=L.filter(c=>c.anulado).length;
+ if(!L.length){$('#app').innerHTML='<div class="empty">Todavía no hay notas de compra.<br><br>Pulsa <b>📥 Carga rápida</b> para registrar la primera.</div>';return}
+ $('#app').innerHTML=`<div class="row"><span class="mu">${L.length} nota(s)${anul?' · '+anul+' anulada(s)':''}</span><span style="flex:1"></span><button class="btn" style="background:#16a34a" onclick="openBulk()">📥 Carga rápida</button>${anul?`<button class="btn g" style="color:var(--danger)" onclick="purgaAnuladas()">🗑 Borrar las ${anul} anuladas</button>`:''}</div>`
+ +L.map(c=>{const d=c.credito==='credito'?diasVence(c.vence):null;
+  let est='';
+  if(d!=null&&d<0)est=`<span class="tag zero">Vencida hace ${-d} día(s)</span>`;
+  else if(d!=null&&d<=7)est=`<span class="tag low">Vence en ${d} día(s)</span>`;
+  else if(d!=null)est=`<span class="tag">Vence ${fFec(c.vence)}</span>`;
+  if(c.anulado)est=`<span class="tag zero">ANULADA</span>`+est;
+  return `<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="showCompra('${c.id}')"><div class="i"><b style="${c.anulado?'text-decoration:line-through':''}">${esc(c.prov||'Sin proveedor')}${c.num?' · N.º '+esc(c.num):''}</b><div class="mu">Nota ${fFec(c.fecha)} · recibida ${fFec(c.recibido)} · ${(c.items||[]).length} art · ${c.unidades||0} uds${c.credito==='credito'?' · A crédito':' · Contado'}${c.foto?' · 📷 foto':''}</div><div style="margin-top:4px">${est}</div></div><b style="${c.anulado?'text-decoration:line-through;color:var(--danger)':''}">${money(c.total||0)}</b></div>`}).join('');
+}
+function showCompra(id){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ const d=c.credito==='credito'?diasVence(c.vence):null;
+ $('#box').innerHTML=`<h3 style="margin:0">Nota de compra ${c.num?'N.º '+esc(c.num):''}${c.anulado?' <span style="color:var(--danger);font-size:14px">· ANULADA</span>':''}</h3>
+ <div class="mu" style="margin-top:4px">${esc(c.prov||'')}</div>
+ <div class="mu" style="margin-top:8px">Fecha: <b>${fFec(c.fecha)}</b> · Recibida: <b>${fFec(c.recibido)}</b><br>Pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>${c.credito==='credito'?` · Vence: <b>${fFec(c.vence)}</b> ${d!=null?(d<0?'<span style="color:var(--danger)">(vencida)</span>':'(faltan '+d+' días)'):''}`:''}<br>Total: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} artículos · ${c.unidades||0} uds</div>
+ ${c.anulado&&c.anuladoDate?`<div class="mu" style="color:var(--danger)">Anulada el ${fFec(c.anuladoDate)}</div>`:''}
+ ${c.foto?`<img src="${c.foto}" style="width:100%;border-radius:10px;margin-top:10px;border:1px solid var(--bd)">`:''}
+ <div style="margin-top:10px;max-height:220px;overflow:auto"><table class="note" style="background:var(--card);color:var(--tx)"><tr><th>Código</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th></tr>
+ ${(c.items||[]).map(i=>`<tr><td>${esc(i.code||'')}</td><td>${esc(i.name)}</td><td class="r">${i.qty}</td><td class="r">${money(i.cost)}</td></tr>`).join('')}</table></div>
+ <div class="row noprint" style="margin-top:12px">
+  ${c.anulado?`<button class="btn" onclick="anularCompra('${c.id}',false)">↩ Reactivar</button>`:`<button class="btn g" style="color:var(--danger)" onclick="anularCompra('${c.id}',true)">⊘ Anular</button>`}
+  <button class="btn g" onclick="delCompra('${c.id}',true)">Solo la nota</button>
+  <button class="btn" style="background:var(--danger)" onclick="delCompra('${c.id}',false)">Nota + artículos</button>
+  <button class="btn g" onclick="closeM()">Cerrar</button></div>
+ <div class="mu" style="margin-top:6px">Anular deja la nota marcada pero sus artículos siguen en el inventario. "Nota + artículos" borra también los artículos que creó.</div>`;
+ $('#modal').classList.add('on');
+}
+function anularCompra(id,on){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ if(on&&!confirm('¿Anular la nota'+(c.num?' N.º '+c.num:'')+'?\n\nQueda marcada como ANULADA, pero sus artículos siguen en el inventario.'))return;
+ c.anulado=!!on;c.anuladoDate=on?new Date().toISOString():null;
+ if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
+ closeM();renderCompras();
+ if(!on)alert('Nota reactivada.');
+}
+function delCompra(id,onlyNote){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ if(!confirm(onlyNote?'¿Borrar solo la nota (los artículos quedan en inventario)?':'¿Borrar la nota Y los artículos que creó?'))return;
+ if(!onlyNote){const ids=(c.items||[]).map(i=>i.id);db.parts=db.parts.filter(p=>!ids.includes(p.id));if(R)ids.forEach(x=>R.doc('parts/'+x).delete().catch(se))}
+ db.compras=db.compras.filter(x=>x.id!==id);
+ if(R)R.doc('compras/'+id).delete().catch(se);else save();
+ closeM();renderCompras();
+}
+function purgaAnuladas(){
+ if(!confirm('¿Borrar DEFINITIVAMENTE todas las notas anuladas y sus artículos?'))return;
+ let n=0;const ids=[],cids=[];
+ (db.compras||[]).forEach(c=>{if(c.anulado){cids.push(c.id);ids.push(...(c.items||[]).map(i=>i.id));n++}});
+ db.parts=db.parts.filter(p=>!ids.includes(p.id));
+ db.compras=(db.compras||[]).filter(c=>!c.anulado);
+ if(R){ids.forEach(x=>R.doc('parts/'+x).delete().catch(se));cids.forEach(x=>R.doc('compras/'+x).delete().catch(se))}else save();
+ renderCompras();
+ alert('Borradas '+n+' notas anuladas.');
 }
 
 /* ---------- NOTAS ---------- */
@@ -553,6 +716,7 @@ function sync(){
  window.loadAllNotes=()=>{notesAll=true;watchNotes()};
  R.doc('config/seq').onSnapshot(s=>{if(s.exists){SEQ=Math.max(SEQ,s.data().n||0)}else if(!notesAll){notesAll=true;watchNotes()}},()=>{});
  watchNotes();
+ R.collection('compras').onSnapshot(s=>{db.compras=s.docs.map(d=>({...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));upd()},()=>{});
  R.doc('config/prices').onSnapshot(s=>{if(s.exists){SET={...SET,...s.data()};parUI();upd()}},()=>{});
  R.doc('config/logo').onSnapshot(s=>{LOGO=s.exists?{...s.data()}:null;upd()},()=>{});
 }
