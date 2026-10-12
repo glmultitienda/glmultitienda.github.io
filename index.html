@@ -704,6 +704,7 @@ function showCompra(id){
  ${c.anulado?`<button class="btn g" onclick="anularCompra('${c.id}',false)">↩ Reactivar nota</button>`
    :`<button class="btn g" style="color:var(--danger)" onclick="anularCompra('${c.id}',true)">⊘ Anular nota</button>`}
  <button class="btn g" onclick="verArt('${c.id}')">Ver artículos</button>
+ <button class="btn" onclick="editarCompra('${c.id}')">✏️ Editar</button>
  ${c.foto?`<button class="btn g" onclick="descNota('${c.id}')">Ver la foto</button>`:''}
  <span style="flex:1"></span>
  <button class="btn g" onclick="delCompra('${c.id}',true)">Solo la nota</button>
@@ -718,6 +719,51 @@ function anularCompra(id,on){
  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
  closeM();renderCompras();
  if(!on)alert('Nota reactivada.');
+}
+function editarCompra(id){
+  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+  // Cargar valores actuales o vacíos si es nueva
+  const proveedorAct=c.proveedor||'';
+  const fechaAct=c.fecha||new Date().toISOString().split('T')[0];
+  const recibidoAct=c.recibido||'';
+  const creditoAct=c.credito||'contado';
+  const venceAct=c.vence||'';
+  // Modal simple usando los inputs que ya existen en la página o crear inputs temporales
+  $('#box').innerHTML=`<div style="max-width:640px;margin:20px auto;padding:20px;background:var(--bg);border-radius:10px">
+  <h3 style="margin:0 0 16px">✏️ Editar nota de compra ${c.num?'N.º '+c.num:''}</h3>
+  <div class="row" style="margin:6px 0"><label style="display:block;margin-bottom:4px">Proveedor</label><input type="text" id="ecProveedor" value="${esc(proveedorAct)}" style="width:100%;padding:6px;border-radius:4px;border:1px var(--bd)</div>
+  <div class="row" style="margin:6px 0"><label style="display:block;margin-bottom:4px">Fecha de la nota</label><input type="date" id="ecFecha" value="${fechaAct}" style="width:100%;padding:6px;border-radius:4px;border:1px var(--bd)</div>
+  <div class="row" style="margin:6px 0"><label style="display:block;margin-bottom:4px">Fecha de recepción</label><input type="date" id="ecRecibido" value="${recibidoAct}" style="width:100%;padding:6px;border-radius:4px;border:1px var(--bd)</div>
+  <div class="row" style="margin:6px 0"><label style="display:block;margin-bottom:4px">Forma de pago</label>
+  <select id="ecPago" style="width:100%;padding:6px;border-radius:4px;border:1px var(--bd">
+    <option value="contado" ${creditoAct==='contado'?'selected':''}>Contado</option>
+    <option value="credito" ${creditoAct==='credito'?'selected':''}>A crédito</option>
+  </select></div>
+  ${venceAct?`<div class="row" style="margin:6px 0"><label style="display:block;margin-bottom:4px">Vence (crédito)</label><input type="date" id="ecVence" value="${venceAct}" style="width:100%;padding:6px;border-radius:4px;border:1px var(--bd)</div>`:''}
+  <div style="margin-top:24px;display:flex;gap:8px">
+    <button class="btn g" onclick="guardarCompra('${c.id}')">✅ Guardar cambios</button>
+    <button class="btn" onclick="renderCompras();$('#modal').classList.add('on')">❌ Cancelar</button>
+  </div></div>`;
+  $('#modal').classList.add('on');
+}
+function guardarCompra(id){
+  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+  // Actualizar campos del formulario
+  const nuevoProveedor = $('#ecProveedor').val().trim()||c.proveedor||'Sin proveedor';
+  const nuevaFecha = $('#ecFecha').val().trim()||c.fecha;
+  const nuevoRecibido = $('#ecRecibido').val().trim()||c.recibido;
+  const nuevoPago = $('#ecPago').val()||c.credito||'contado';
+  const nuevaVence = $('#ecVence').val().trim()||c.vence;
+  // Mantener otros campos intactos
+  c.proveedor = nuevoProveedor;
+  c.fecha = nuevaFecha;
+  c.recibido = nuevoRecibido;
+  c.credito = nuevoPago;
+  c.vence = nuevaVence;
+  // Guardar en Firestore o localStorage
+  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
+  closeM();renderCompras();
+  alert('Nota de compra actualizada correctamente.');
 }
 function borraNotas(lista,borrarArts){
  let borrados=0;const conservados=[];
