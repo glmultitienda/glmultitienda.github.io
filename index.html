@@ -747,23 +747,59 @@ function editarCompra(id){
   $('#modal').classList.add('on');
 }
 function guardarCompra(id){
-  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
-  // Actualizar campos del formulario
-  const nuevoProveedor = $('#ecProveedor').val().trim()||c.proveedor||'Sin proveedor';
-  const nuevaFecha = $('#ecFecha').val().trim()||c.fecha;
-  const nuevoRecibido = $('#ecRecibido').val().trim()||c.recibido;
-  const nuevoPago = $('#ecPago').val()||c.credito||'contado';
-  const nuevaVence = $('#ecVence').val().trim()||c.vence;
-  // Mantener otros campos intactos
-  c.proveedor = nuevoProveedor;
-  c.fecha = nuevaFecha;
-  c.recibido = nuevoRecibido;
-  c.credito = nuevoPago;
-  c.vence = nuevaVence;
-  // Guardar en Firestore o localStorage
-  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
-  closeM();renderCompras();
-  alert('Nota de compra actualizada correctamente.');
+  // Paso 1: Confirmación de que la función se está ejecutando
+  alert('🟢 guardarCompra INICIADO con id: ' + id);
+  
+  try {
+    // Paso 2: Buscar la nota
+    const c=(db.compras||[]).find(x=>x.id===id);if(!c){ alert('❌ No se encontró la nota con id '+id); return; }
+    alert('📝 Nota encontrada: ' + (c.proveedor||'sin proveedor'));
+    
+    // Paso 3: Verificar que los inputs del modal existen
+    const $eProveedor = $('#ecProveedor');
+    const $eFecha = $('#ecFecha');
+    const $eRecibido = $('#ecRecibido');
+    const $ePago = $('#ecPago');
+    const $eVence = $('#ecVence');
+    
+    if(!$eProveedor.length){ alert('❌ Input #ecProveedor NO encontrado en el DOM'); return; }
+    if(!$eFecha.length){ alert('❌ Input #ecFecha NO encontrado en el DOM'); return; }
+    
+    // Paso 4: Obtener valores de los inputs
+    const nuevoProveedor = $eProveedor.val().trim()||c.proveedor||'Sin proveedor';
+    const nuevaFecha = $eFecha.val().trim()||c.fecha;
+    const nuevoRecibido = $eRecibido.val().trim()||c.recibido;
+    const nuevoPago = $ePago.val()||c.credito||'contado';
+    const nuevaVence = $eVence.val().trim()||c.vence;
+    
+    alert('💾 Datos a guardar - Proveedor: ' + nuevoProveedor + ', Fecha: ' + nuevaFecha);
+    
+    // Paso 5: Actualizar el objeto
+    c.proveedor = nuevoProveedor;
+    c.fecha = nuevaFecha;
+    c.recibido = nuevoRecibido;
+    c.credito = nuevoPago;
+    c.vence = nuevaVence;
+    
+    alert('💾 Objeto actualizado, guardando...');
+    
+    // Paso 6: Guardar en Firebase o localStorage
+    if(typeof R !== 'undefined' && R){ 
+      alert('🔥 Guardando en Firebase...');
+      R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(function(err){ alert('❌ Error Firebase: ' + err.message); }); 
+    } else {
+      alert('💾 Guardando en localStorage...');
+      save();
+    }
+    
+    // Paso 7: Cerrar modal y refrescar
+    closeM();
+    renderCompras();
+    alert('✅ Nota de compra actualizada correctamente.');
+    
+  } catch(e) {
+    alert('💥 ERROR INESPERADO: ' + String(e).slice(0,200));
+  }
 }
 function borraNotas(lista,borrarArts){
  let borrados=0;const conservados=[];
