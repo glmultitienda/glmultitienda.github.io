@@ -302,7 +302,7 @@ function addStock(id){const p=find(id);if(!p)return;
  $('#box').innerHTML=`<h3 style="margin:0">Entrada de stock</h3><div class="mu">${esc(p.name)} · quedan ${p.stock}</div><label>Unidades que entran</label><input id="st_n" type="number" min="1" step="1" inputmode="numeric" value="1"><div class="row" style="margin-top:14px"><button class="btn" onclick="saveStock('${p.id}')">Agregar</button><button class="btn g" onclick="closeM()">Cancelar</button></div>`;
  $('#modal').classList.add('on')}
 function saveStock(id){const p=find(id);if(!p)return;const n=parseInt((($('#st_n')||{}).value)||0)||0;if(n<=0){alert('Escribe cuántas unidades entran');return}p.stock+=n;commit([p]);closeM();render()}
-function closeM(){$('#modal').classList.remove('on')}
+function closeM(){$('#modal').classList.remove('on');const b=$('#box');if(b)b.style.maxWidth=''}
 async function exportDb(){
  if(!notesAll&&window.loadAllNotes){window.loadAllNotes();for(let i=0;i<25&&!window._nAll;i++)await new Promise(r=>setTimeout(r,300))}
  const dl=DL;
@@ -353,6 +353,7 @@ function checkout(){
 
 /* ---------- CARGA RÁPIDA Y COMPRAS ---------- */
 let BLK={rows:[],malas:[],foto:null,prov:'',num:'',credito:'contado',vence:''};
+function dISO(off){const d=new Date();d.setDate(d.getDate()+(off||0));return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
 function fFec(x){const d=x?new Date(x):null;return d&&!isNaN(d)?d.toLocaleDateString('es'):'—'}
 function diasVence(v){const d=new Date(String(v||'').slice(0,10)+'T00:00:00');if(isNaN(d))return null;const n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5)}
 function bnum(s){let t=String(s==null?'':s).trim().replace(/[^\d.,-]/g,'');if(!t)return NaN;
@@ -361,16 +362,18 @@ function bnum(s){let t=String(s==null?'':s).trim().replace(/[^\d.,-]/g,'');if(!t
  return +t}
 function comprimeImg(file,maxPx,q){return new Promise(res=>{const rd=new FileReader();rd.onload=()=>{const im=new Image();im.onload=()=>{const k=Math.min(1,maxPx/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k);c.height=Math.round(im.height*k);c.getContext('2d').drawImage(im,0,0,c.width,c.height);res(c.toDataURL('image/jpeg',q||.8))};im.src=rd.result};rd.onerror=()=>res(null);rd.readAsDataURL(file)})}
 function openBulk(){
- BLK={rows:[],malas:[],foto:null,prov:'',num:'',credito:'contado',vence:new Date().toISOString().slice(0,10)};
+ BLK={rows:[],malas:[],foto:null,prov:'',num:'',credito:'contado',fecha:dISO(0),recibido:dISO(0),vence:dISO(30)};
  $('#box').innerHTML=`<h3 style="margin:0">📥 Carga rápida de mercancía</h3>
- <div class="mu" style="margin:4px 0 10px">Pega el texto de la nota de compra o adjunta la foto (queda como respaldo). Formato por línea: <b>código | marca | cantidad | descripción | precio</b> — separado por |, TAB, ; o espacios. Ejemplo: <b>CT846 | CONTINENTAL | 2 | Correa De Tiempo | 12.81</b></div>
- <div style="display:flex;gap:8px"><div style="flex:1"><label>Proveedor</label><input id="b_prov" placeholder="Nombre del proveedor"></div><div style="flex:1"><label>N.º de nota (opcional)</label><input id="b_num" placeholder="Factura / nota"></div></div>
- <div style="display:flex;gap:8px"><div style="flex:1"><label>Forma de pago</label><select id="b_cred" onchange="blCred(this.value)"><option value="contado">Contado</option><option value="credito">A crédito</option></select></div><div style="flex:1" id="b_venceBox"><label>Vence</label><input id="b_vence" type="date" value="${BLK.vence}"></div></div>
+ <div class="mu" style="margin:4px 0 10px">Pega el texto de la nota de compra o adjunta la foto (queda como respaldo). Formato por línea: <b>código | marca | cantidad | descripción | precio</b> — separado por |, TAB, ; o espacios. Al dar <b>Analizar</b> podrás editar código, marca, descripción, cantidad y costo de cada artículo, y calcular el precio de venta con <b>+50%</b> o <b>+100%</b> (por artículo o todos de una vez).</div>
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Empresa / Proveedor</label><input id="b_prov" placeholder="Nombre de la empresa"></div><div style="flex:1"><label>N.º de factura</label><input id="b_num" placeholder="Número de factura"></div></div>
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Fecha de emisión</label><input id="b_fecha" type="date" value="${BLK.fecha}"></div><div style="flex:1"><label>Fecha de recepción</label><input id="b_rec" type="date" value="${BLK.recibido}"></div></div>
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Forma de pago</label><select id="b_cred" onchange="blCred(this.value)"><option value="contado">Contado</option><option value="credito">A crédito</option></select></div><div style="flex:1" id="b_venceBox"><label>Vencimiento (crédito)</label><input id="b_vence" type="date" value="${BLK.vence}"></div></div>
  <label>Texto de la nota</label><textarea id="b_txt" rows="6" placeholder="codigo|marca|cantidad|descripcion|precio&#10;Ej: 6Q0-199-555AS|STAR PARTS|1|Base De Caja Izquierda Vw Fox|22.22" style="font-family:ui-monospace,Consolas,monospace;font-size:13px"></textarea>
  <label>Foto de la nota (opcional)</label><input type="file" accept="image/*" onchange="blFoto(this)">
  <div id="b_prev" style="margin-top:10px"></div>
  <div class="row" style="margin-top:14px"><button class="btn" onclick="bulkAnaliza()">🔍 Analizar texto</button><button class="btn" style="background:#16a34a;display:none" onclick="bulkGuarda()" id="b_save">💾 Guardar compra</button><button class="btn g" onclick="bulkLimpia()">Limpiar</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
  $('#modal').classList.add('on');
+ $('#box').style.maxWidth='1000px';
  blCred('contado');
 }
 function blCred(v){BLK.credito=v;const b=$('#b_venceBox');if(b)b.style.display=v==='credito'?'block':'none'}
@@ -404,7 +407,8 @@ function blParseLine(line){
 function bulkAnaliza(){
  const txt=$('#b_txt').value||'';
  BLK.prov=$('#b_prov').value.trim();BLK.num=$('#b_num').value.trim();
- const ve=$('#b_vence');if(ve)BLK.vence=ve.value;
+ const fe=$('#b_fecha'),rc=$('#b_rec'),ve=$('#b_vence');
+ if(fe)BLK.fecha=fe.value;if(rc)BLK.recibido=rc.value;if(ve)BLK.vence=ve.value;
  BLK.rows=[];BLK.malas=[];
  txt.split(/\r?\n/).forEach((ln,i)=>{const t=ln.trim();if(!t)return;
   if(i===0&&/c[oó]digo|c[oó]d/i.test(t)&&isNaN(bnum(t)))return;
@@ -419,15 +423,37 @@ function renderBulk(){
  BLK.rows.forEach(bulkCalc);
  const sv=$('#b_save');if(sv)sv.style.display=BLK.rows.length?'inline-flex':'none';
  $('#b_prev').innerHTML=(BLK.foto?`<img src="${BLK.foto}" style="max-height:130px;border-radius:10px;border:1px solid var(--bd)">`:'')+
- `<table class="note" style="margin-top:10px;background:var(--card);color:var(--tx)"><tr><th></th><th>Código</th><th>Marca</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th><th class="r">Total</th></tr>
- ${BLK.rows.map((r,i)=>`<tr><td><button class="btn g s" onclick="bulkRm(${i})">✕</button></td><td>${esc(r.code)}</td><td>${esc(r.brand)}</td><td>${esc(r.name)}</td>
- <td class="r"><input type="number" min="1" step="1" value="${r.qty}" style="width:70px;padding:6px" oninput="bulkSet(${i},'qty',this.value)"></td>
- <td class="r"><input type="number" min="0" step="0.01" value="${r.cost}" style="width:90px;padding:6px" oninput="bulkSet(${i},'cost',this.value)"></td>
- <td class="r" id="bt${i}">${money(r.total)}</td></tr>`).join('')}
- <tr><td colspan="4" class="r"><b>Totales</b></td><td class="r"><b>${bulkUnid()}</b></td><td></td><td class="r"><b>${money(bulkCosto())}</b></td></tr></table>
+ `<div class="row" style="margin:10px 0 6px"><span class="mu">Todo es editable. Precio de venta (sobre el costo, con diferencial ${pf(difPct())}):</span><button class="btn s" onclick="bulkPriceAll(50)">Todo +50%</button><button class="btn s" onclick="bulkPriceAll(100)">Todo +100%</button></div>
+ <div class="mu" style="margin-bottom:6px">Si calculas el precio (+50% / +100%) se aplica al guardar, tanto a artículos <b>NUEVOS</b> como a los que <b>ya existen</b>. Sin cálculo, los existentes solo actualizan stock y costo.</div>
+ <div style="overflow-x:auto"><table class="note" style="background:var(--card);color:var(--tx)"><tr><th></th><th>Código</th><th>Marca</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th><th class="r">Total</th><th>Precio de venta</th></tr>
+ ${BLK.rows.map((r,i)=>{
+  const ex=db.parts.some(x=>(x.code||'').toUpperCase()===String(r.code||'').toUpperCase());
+  return `<tr>
+  <td><button class="btn g s" onclick="bulkRm(${i})">✕</button></td>
+  <td><input value="${esc(r.code)}" style="width:100px;padding:6px" oninput="bulkField(${i},'code',this.value)"></td>
+  <td><input value="${esc(r.brand)}" style="width:90px;padding:6px" oninput="bulkField(${i},'brand',this.value)"></td>
+  <td><input value="${esc(r.name)}" style="width:230px;padding:6px" oninput="bulkField(${i},'name',this.value)"></td>
+  <td class="r"><input type="number" min="1" step="1" value="${r.qty}" style="width:64px;padding:6px" oninput="bulkSet(${i},'qty',this.value)"></td>
+  <td class="r"><input type="number" min="0" step="0.01" value="${r.cost}" style="width:80px;padding:6px" oninput="bulkSet(${i},'cost',this.value)"></td>
+  <td class="r" id="bt${i}">${money(r.total)}</td>
+  <td><div class="acts" style="margin-top:0"><button class="btn s g" onclick="bulkPrice(${i},50)">+50%</button><button class="btn s g" onclick="bulkPrice(${i},100)">+100%</button></div>
+  <div class="mu" id="bp${i}" style="margin-top:3px">${r.pbcv?'BCV '+money(r.pbcv)+' · CASH '+money(r.pcash)+' · ML '+money(r.pml):ex?'<span class="tag">Ya existe</span>':'<span class="tag low">NUEVO</span>'}</div></td></tr>`}).join('')}
+ <tr><td colspan="4" class="r"><b>Totales</b></td><td class="r"><b>${bulkUnid()}</b></td><td></td><td class="r"><b>${money(bulkCosto())}</b></td><td></td></tr></table></div>
  ${BLK.malas.length?`<div class="mu" style="margin-top:8px">⚠ ${BLK.malas.length} línea(s) no entendida(s) (revisa el formato):</div><div class="mu" style="white-space:pre-wrap;background:var(--panel);padding:8px;border-radius:8px">${esc(BLK.malas.join('\n'))}</div>`:''}`;
 }
 function bulkSet(i,f,v){const r=BLK.rows[i];if(!r)return;if(f==='qty')r.qty=Math.max(1,parseInt(v)||1);else r.cost=Math.max(0,bnum(v)||0);bulkCalc(r);const c=$('#bt'+i);if(c)c.textContent=money(r.total)}
+function bulkField(i,f,v){const r=BLK.rows[i];if(r)r[f]=v}
+function bulkPrice(i,pct){
+ const r=BLK.rows[i];if(!r)return;
+ r.pct=pct;
+ const base=Math.round((+r.cost||0)*(1+pct/100)*10000)/10000;
+ r.pbcv=Math.round(base*(1+difPct()/100)*100)/100;
+ r.pcash=cashOf(r.pbcv);
+ r.pml=Math.round(mlPrice(r.pcash)*100)/100;
+ const e=$('#bp'+i);
+ if(e)e.innerHTML='BCV '+money(r.pbcv)+' · CASH '+money(r.pcash)+' · ML '+money(r.pml);
+}
+function bulkPriceAll(pct){BLK.rows.forEach((r,i)=>bulkPrice(i,pct))}
 function bulkRm(i){BLK.rows.splice(i,1);renderBulk()}
 function bulkLimpia(){BLK.rows=[];BLK.malas=[];const t=$('#b_txt');if(t)t.value='';const p=$('#b_prev');if(p)p.innerHTML='';const s=$('#b_save');if(s)s.style.display='none'}
 function bulkGuarda(){
@@ -436,9 +462,12 @@ function bulkGuarda(){
  const items=BLK.rows.map(r=>{
   const code=r.code.toUpperCase();
   let p=db.parts.find(x=>(x.code||'').toUpperCase()===code);
-  if(p){p.stock+=r.qty;p.cost=r.cost;if(!ps.includes(p))ps.push(p)}
+  if(p){p.stock+=r.qty;p.cost=r.cost;
+   if(r.pct){const b2=Math.round((+r.cost||0)*(1+r.pct/100)*10000)/10000;p.base=b2;p.pbcv=Math.round(b2*(1+difPct()/100)*100)/100;p.pcash=cashOf(p.pbcv);p.pml=Math.round(mlPrice(p.pcash)*100)/100;p.price=p.pbcv}
+   if(!ps.includes(p))ps.push(p)}
   else{
-   const base=Math.round(r.cost*2*10000)/10000;
+   const pct=r.pct||100;
+   const base=Math.round((+r.cost||0)*(1+pct/100)*10000)/10000;
    const pbcv=Math.round(base*(1+difPct()/100)*100)/100;
    const pcash=cashOf(pbcv);
    p={id:uid(),ts:Date.now(),name:r.name,code,brand:r.brand||'',cost:r.cost,base,cman:false,pbcv,price:pbcv,pcash,pml:Math.round(mlPrice(pcash)*100)/100,mman:false,stock:r.qty,min:1,img:''};
@@ -447,7 +476,7 @@ function bulkGuarda(){
   return{id:p.id,code,brand:r.brand||'',name:r.name,qty:r.qty,cost:r.cost};
  });
  const total=Math.round(items.reduce((a,i)=>a+i.qty*i.cost,0)*100)/100;
- const c={id,ts:Date.now(),prov:BLK.prov||'Sin proveedor',num:BLK.num,fecha:new Date().toISOString().slice(0,10),recibido:new Date().toISOString().slice(0,10),credito:BLK.credito,vence:BLK.credito==='credito'?BLK.vence:null,items,total,unidades:bulkUnid(),foto:BLK.foto||null,anulado:false,anuladoDate:null};
+ const c={id,ts:Date.now(),prov:BLK.prov||'Sin proveedor',num:BLK.num,fecha:BLK.fecha,recibido:BLK.recibido,credito:BLK.credito,vence:BLK.credito==='credito'?BLK.vence:null,items,total,unidades:bulkUnid(),foto:BLK.foto||null,anulado:false,anuladoDate:null};
  db.compras.unshift(c);
  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);
  commit(ps);
@@ -455,6 +484,26 @@ function bulkGuarda(){
  document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x.dataset.v==='compras'));
  renderCompras();
  alert('Compra guardada: '+items.length+' artículos, '+bulkUnid()+' uds, '+money(total)+'.\nEl inventario se actualizó.');
+}
+function editCompra(id){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ $('#box').innerHTML=`<h3 style="margin:0">✏️ Datos de la compra</h3>
+ <div class="mu" style="margin:4px 0 8px">${(c.items||[]).length} artículos · ${c.unidades||0} uds · ${money(c.total||0)}</div>
+ <label>Empresa / Proveedor</label><input id="e_prov" value="${esc(c.prov||'')}">
+ <label>N.º de factura</label><input id="e_num" value="${esc(c.num||'')}">
+ <div style="display:flex;gap:8px"><div style="flex:1"><label>Fecha de emisión</label><input id="e_fecha" type="date" value="${(c.fecha||'').slice(0,10)}"></div><div style="flex:1"><label>Fecha de recepción</label><input id="e_rec" type="date" value="${(c.recibido||'').slice(0,10)}"></div></div>
+ <div class="row" style="margin-top:14px"><button class="btn" onclick="saveCompraData('${c.id}')">💾 Guardar</button><button class="btn g" onclick="showCompra('${c.id}')">Cancelar</button></div>`;
+ $('#modal').classList.add('on');
+}
+function saveCompraData(id){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ c.prov=$('#e_prov').value.trim()||'Sin proveedor';
+ c.num=$('#e_num').value.trim();
+ const fe=$('#e_fecha'),rc=$('#e_rec');
+ if(fe&&fe.value)c.fecha=fe.value;
+ if(rc&&rc.value)c.recibido=rc.value;
+ if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
+ showCompra(id);renderCompras();
 }
 function renderCompras(){
  const L=db.compras||[];
@@ -474,13 +523,14 @@ function showCompra(id){
  const d=c.credito==='credito'?diasVence(c.vence):null;
  $('#box').innerHTML=`<h3 style="margin:0">Nota de compra ${c.num?'N.º '+esc(c.num):''}${c.anulado?' <span style="color:var(--danger);font-size:14px">· ANULADA</span>':''}</h3>
  <div class="mu" style="margin-top:4px">${esc(c.prov||'')}</div>
- <div class="mu" style="margin-top:8px">Fecha: <b>${fFec(c.fecha)}</b> · Recibida: <b>${fFec(c.recibido)}</b><br>Pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>${c.credito==='credito'?` · Vence: <b>${fFec(c.vence)}</b> ${d!=null?(d<0?'<span style="color:var(--danger)">(vencida)</span>':'(faltan '+d+' días)'):''}`:''}<br>Total: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} artículos · ${c.unidades||0} uds</div>
+ <div class="mu" style="margin-top:8px">Emisión: <b>${fFec(c.fecha)}</b> · Recibida: <b>${fFec(c.recibido)}</b><br>Pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>${c.credito==='credito'?` · Vence: <b>${fFec(c.vence)}</b> ${d!=null?(d<0?'<span style="color:var(--danger)">(vencida)</span>':'(faltan '+d+' días)'):''}`:''}<br>Total: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} artículos · ${c.unidades||0} uds</div>
  ${c.anulado&&c.anuladoDate?`<div class="mu" style="color:var(--danger)">Anulada el ${fFec(c.anuladoDate)}</div>`:''}
  ${c.foto?`<img src="${c.foto}" style="width:100%;border-radius:10px;margin-top:10px;border:1px solid var(--bd)">`:''}
  <div style="margin-top:10px;max-height:220px;overflow:auto"><table class="note" style="background:var(--card);color:var(--tx)"><tr><th>Código</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th></tr>
  ${(c.items||[]).map(i=>`<tr><td>${esc(i.code||'')}</td><td>${esc(i.name)}</td><td class="r">${i.qty}</td><td class="r">${money(i.cost)}</td></tr>`).join('')}</table></div>
  <div class="row noprint" style="margin-top:12px">
   ${c.anulado?`<button class="btn" onclick="anularCompra('${c.id}',false)">↩ Reactivar</button>`:`<button class="btn g" style="color:var(--danger)" onclick="anularCompra('${c.id}',true)">⊘ Anular</button>`}
+  <button class="btn g" onclick="editCompra('${c.id}')">✏️ Editar datos</button>
   <button class="btn g" onclick="delCompra('${c.id}',true)">Solo la nota</button>
   <button class="btn" style="background:var(--danger)" onclick="delCompra('${c.id}',false)">Nota + artículos</button>
   <button class="btn g" onclick="closeM()">Cerrar</button></div>
@@ -521,7 +571,8 @@ function zoom(id){const p=find(id);if(!p||!p.img)return;
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
 function moreNotes(){return notesAll?'':'<div class="panel mu" style="margin:0 0 10px">Mostrando las notas de los últimos 60 días. <button class="btn s g" onclick="loadAllNotes()">Ver notas anteriores</button></div>'}
 function renderNotes(){
- $('#app').innerHTML=moreNotes()+(db.notes.length?db.notes.map(n=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="showNote(${n.no})"><div class="i"><b>Nota N.º ${String(n.no).padStart(5,'0')}</b><div class="mu">${new Date(n.date).toLocaleString('es')} · ${esc(n.client)}${n.void?' · ANULADA':''}</div></div><b style="${n.void?'text-decoration:line-through;color:var(--danger)':''}">${money(n.total)}</b></div>`).join(''):'<div class="empty">Aún no hay notas de entrega.</div>');
+ const anul=db.notes.filter(n=>n.void).length;
+ $('#app').innerHTML=moreNotes()+(db.notes.length?`<div class="row"><span class="mu">${db.notes.length} nota(s)${anul?' · '+anul+' anulada(s)':''}</span><span style="flex:1"></span>${anul?`<button class="btn g" style="color:var(--danger)" onclick="purgeVoidNotes()">🗑 Borrar las ${anul} anuladas</button>`:''}</div>`+db.notes.map(n=>`<div class="card" style="margin-bottom:8px;cursor:pointer" onclick="showNote(${n.no})"><div class="i"><b>Nota N.º ${String(n.no).padStart(5,'0')}</b><div class="mu">${new Date(n.date).toLocaleString('es')} · ${esc(n.client)}${n.void?' · ANULADA':''}</div></div><b style="${n.void?'text-decoration:line-through;color:var(--danger)':''}">${money(n.total)}</b></div>`).join(''):'<div class="empty">Aún no hay notas de entrega.</div>');
 }
 function showNote(no){
  const n=db.notes.find(x=>x.no===no);
@@ -532,7 +583,7 @@ function showNote(no){
  ${n.items.map(i=>`<tr><td>${i.qty}</td><td>${esc(i.name)}<br><small>${esc(i.code)}</small></td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
  <tr><td colspan="3" class="r"><b>TOTAL</b></td><td class="r"><b>${money(n.total)}</b></td></tr>${n.bs>0?`<tr><td colspan="3" class="r"><b>TOTAL Bs</b></td><td class="r"><b>Bs ${bsf(n.bs)}</b></td></tr>`:''}</table></div>
  <div class="sig"><div>Entregado por</div><div>Recibido por</div></div></div>
- <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">⬇ Descargar PDF</button><button class="btn" style="background:#16a34a" onclick="pdfNote(${n.no},true)">WhatsApp</button><button class="btn g" onclick="window.print()">🖨 Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" style="color:var(--danger)" onclick="voidNote(${n.no})">Anular nota</button>`}<button class="btn g" onclick="closeM()">Cerrar</button></div>`;
+ <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">⬇ Descargar PDF</button><button class="btn" style="background:#16a34a" onclick="pdfNote(${n.no},true)">WhatsApp</button><button class="btn g" onclick="window.print()">🖨 Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" style="color:var(--danger)" onclick="voidNote(${n.no})">Anular nota</button>`}<button class="btn" style="background:var(--danger)" onclick="delNote(${n.no})">🗑 Borrar</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
  $('#modal').classList.add('on');
 }
 function clients(){
@@ -625,6 +676,23 @@ function voidNote(no){
  commit(ps,[n]);
  if(miss)alert(miss+' repuesto(s) ya no existen en el inventario; no se pudo devolver su stock.');
  showNote(no);render();
+}
+function delNote(no){
+ const n=db.notes.find(x=>x.no===no);if(!n)return;
+ if(!confirm('¿Borrar DEFINITIVAMENTE la nota N.º '+String(no).padStart(5,'0')+'?'+(n.void?'':'\n\n⚠ No está anulada: el stock NO se devuelve al inventario.')))return;
+ db.notes=db.notes.filter(x=>x.no!==no);
+ if(R)R.doc('notes/'+no).delete().catch(se);else save();
+ closeM();renderNotes();
+}
+function purgeVoidNotes(){
+ const v=db.notes.filter(n=>n.void);
+ if(!v.length){alert('No hay notas anuladas.');return}
+ if(!confirm('¿Borrar DEFINITIVAMENTE '+v.length+' nota(s) anulada(s)? Esto no se puede deshacer.'))return;
+ const nos=v.map(n=>n.no);
+ db.notes=db.notes.filter(n=>!n.void);
+ if(R)nos.forEach(x=>R.doc('notes/'+x).delete().catch(se));else save();
+ renderNotes();
+ alert('Borradas '+nos.length+' notas anuladas.');
 }
 function setRep(k){repP=k;renderRep()}
 function repFrom(){const d=new Date(),s=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(repP==='semana')s.setDate(s.getDate()-6);else if(repP==='mes')s.setDate(1);else if(repP==='todo')return new Date(0);return s}
