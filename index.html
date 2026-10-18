@@ -32,6 +32,14 @@ window.dispatchEvent(new Event('fbready'));
 }catch(e){window.__fbErr=e;window.dispatchEvent(new Event('fberror'))}
 </script>
 <title>GL Multitienda – Inventario</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#0b2545">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GL Multitienda">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
 --bg:#f4f6f9;--card:#fff;--tx:#12233d;--mu:#677e99;--bd:#dbe3ed;
@@ -845,6 +853,9 @@ function sync(){
  R.doc('config/prices').onSnapshot(s=>{if(s.exists){SET={...SET,...s.data()};parUI();upd()}},()=>{});
  R.doc('config/logo').onSnapshot(s=>{LOGO=s.exists?{...s.data()}:null;upd()},()=>{});
 }
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})}
 </script>
 </body>
 </html>
