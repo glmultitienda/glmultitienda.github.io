@@ -1,5 +1,5 @@
-const CACHE = 'gl-multitienda-v1';
-const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
+const CACHE = 'gl-multitienda-v7';
+const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './assets/dashboard-hero.png', './assets/app-resumen.png', './assets/app-inventario.png', './assets/app-vender.png', './assets/app-notas.png', './assets/app-movil.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));

@@ -521,6 +521,8 @@ input[type=checkbox]{width:auto;min-height:0}
    <button data-v="sell"><svg class="ic" aria-hidden="true"><use href="#i-cart"/></svg><span>Vender</span></button>
    <button data-v="compras"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><span>Compras</span></button>
    <button data-v="gastos"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg><span>Gastos</span></button>
+   <button data-v="creditos"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span>Créditos</span></button>
+   <button data-v="caja"><svg class="ic" aria-hidden="true"><use href="#i-dollar"/></svg><span>Caja</span></button>
    <button data-v="notes"><svg class="ic" aria-hidden="true"><use href="#i-receipt"/></svg><span>Notas</span></button>
    <button data-v="cli"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span>Clientes</span></button>
    <button data-v="rep"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span>Reportes</span></button>
@@ -563,6 +565,8 @@ input[type=checkbox]{width:auto;min-height:0}
   <div class="sheet-grid">
    <button class="sheet-btn" data-v="compras"><svg class="ic" aria-hidden="true"><use href="#i-truck"/></svg><span>Compras</span></button>
    <button class="sheet-btn" data-v="gastos"><svg class="ic" aria-hidden="true"><use href="#i-wallet"/></svg><span>Gastos</span></button>
+   <button class="sheet-btn" data-v="creditos"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span>Créditos</span></button>
+   <button class="sheet-btn" data-v="caja"><svg class="ic" aria-hidden="true"><use href="#i-dollar"/></svg><span>Caja</span></button>
    <button class="sheet-btn" data-v="cli"><svg class="ic" aria-hidden="true"><use href="#i-users"/></svg><span>Clientes</span></button>
    <button class="sheet-btn" data-v="rep"><svg class="ic" aria-hidden="true"><use href="#i-chart"/></svg><span>Reportes</span></button>
    <button class="sheet-btn" onclick="toggleMore(false);openCalc()"><svg class="ic" aria-hidden="true"><use href="#i-calc"/></svg><span>Calculadora</span></button>
@@ -1113,9 +1117,9 @@ footer{padding:46px 0 30px;border-top:1px solid var(--bd);margin-top:74px;backgr
 <div id="modal"><button class="modal-x noprint" onclick="closeM()" aria-label="Cerrar"><svg class="ic" aria-hidden="true"><use href="#i-x"/></svg></button><div class="box" id="box"></div></div>
 
 <script>
-let LOGO=null,CL=[],db={parts:[],notes:[],compras:[],gastos:[]},R=null,mig=false,view='dash',q='',cart=[],client={name:'',phone:'',ci:''},mlFil='all';
-let USER=null,synced=false,mediaWarned=false,payMethod='Efectivo',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,gP='mes',gFil='all',SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum',autoRecalc:true};
-const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro'];
+let LOGO=null,CL=[],db={parts:[],notes:[],compras:[],gastos:[],creditos:[],cierres:[]},R=null,mig=false,view='dash',q='',cart=[],client={name:'',phone:'',ci:''},mlFil='all';
+let USER=null,synced=false,mediaWarned=false,payMethod='Efectivo',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,gP='mes',gFil='all',fFil='pend',ventaVence='',SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum',autoRecalc:true};
+const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro','Crédito'];
 const ADMINS=[]; // correos con acceso a costos y ganancias (vacío = todos)
 const isAdmin=()=>!ADMINS.length||(USER&&ADMINS.includes((USER.email||'').toLowerCase()));
 const DL={save:async({filename,data})=>{const b=data instanceof Blob?data:new Blob([data]);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=filename;document.body.appendChild(a);a.click();a.remove()}};
@@ -1175,7 +1179,7 @@ const match=p=>{const h=nz(p.name+' '+p.code+' '+p.brand);return nz(q).split(/\s
 const tag=p=>p.stock<=0?'<span class="tag zero">Agotado</span>':p.stock<=1?`<span class="tag low">Quedan ${p.stock}</span>`:`<span class="tag">${p.stock} en stock</span>`;
 const pic=p=>p.img?`<img src="${p.img}" alt="" style="cursor:zoom-in" onclick="zoom('${p.id}')">`:'<div class="ph">⚙️</div>';
 
-const PAGE_META={dash:['Resumen','Tu negocio de un vistazo'],inv:['Inventario','Stock, precios y publicación'],sell:['Vender','Arma la venta y genera la nota'],compras:['Compras','Proveedores y notas de compra'],notes:['Notas','Notas de entrega emitidas'],cli:['Clientes','Historial y contacto'],gastos:['Gastos','Alquiler, sueldos y gastos del mes'],rep:['Reportes','Ventas, gastos y utilidad']};
+const PAGE_META={dash:['Resumen','Tu negocio de un vistazo'],inv:['Inventario','Stock, precios y publicación'],sell:['Vender','Arma la venta y genera la nota'],compras:['Compras','Proveedores y notas de compra'],notes:['Notas','Notas de entrega emitidas'],cli:['Clientes','Historial y contacto'],gastos:['Gastos','Alquiler, sueldos y gastos del mes'],creditos:['Créditos','Cuentas por cobrar y abonos'],caja:['Cierre de caja','Cuadre del día y arqueo'],rep:['Reportes','Ventas, gastos y utilidad']};
 
 function updateTopbar(){
  const m=PAGE_META[view]||PAGE_META.dash,t=$('#pageTitle'),s=$('#pageSub');
@@ -1186,10 +1190,12 @@ function updateTopbar(){
   else if(view==='compras'){const n=(db.compras||[]).length;s.textContent=n+' '+pl(n,'nota de compra registrada','notas de compra registradas');}
   else if(view==='notes'){const n=db.notes.length;s.textContent=n+' '+pl(n,'nota emitida','notas emitidas');}
  else if(view==='gastos'){const t=sumGastos(...gRange()),p=(db.gastos||[]).filter(g=>!g.pagado).length;s.textContent=money(t)+' en el período'+(p?' · '+p+' por pagar':'');}
+  else if(view==='creditos'){const n=fPendList().length;s.textContent=n?money(fCobrar())+' por cobrar · '+n+' '+pl(n,'crédito','créditos'):'Sin deudas pendientes';}
+  else if(view==='caja'){s.textContent=cajaDay===dISO(0)?'Cuadre de hoy':fFec(cajaDay);}
   else if(view==='cli'){const n=clients().length;s.textContent=n+' '+pl(n,'cliente con compras','clientes con compras');}
   else s.textContent=m[1];
  }
- const mb=$('#moreBtn2');if(mb)mb.classList.toggle('on',['compras','cli','rep'].includes(view));
+ const mb=$('#moreBtn2');if(mb)mb.classList.toggle('on',['compras','cli','rep','gastos','creditos','caja'].includes(view));
 }
 function goView(v){
  view=v;q='';toggleMore(false);
@@ -1204,7 +1210,7 @@ function toggleMore(force){
 document.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>goView(b.dataset.v));
 
 function render(){
- if(view==='dash')renderDash();else if(view==='inv')renderInv();else if(view==='compras')renderCompras();else if(view==='sell')renderSell();else if(view==='cli')renderCli();else if(view==='gastos')renderGastos();else if(view==='rep')renderRep();else renderNotes();
+ if(view==='dash')renderDash();else if(view==='inv')renderInv();else if(view==='compras')renderCompras();else if(view==='sell')renderSell();else if(view==='cli')renderCli();else if(view==='gastos')renderGastos();else if(view==='creditos')renderCreditos();else if(view==='caja')renderCaja();else if(view==='rep')renderRep();else renderNotes();
  updateTopbar();
 }
 
@@ -1277,6 +1283,8 @@ function renderDash(){
  <div class="list-row" style="cursor:pointer" onclick="openSet()"><div class="thumb">${ico('sliders')}</div><div class="list-main"><div class="list-title">Precios y tasas</div><div class="list-meta">Paralelo, descuento y comisiones</div></div>${ico('arrow-right')}</div>
  <div class="list-row" style="cursor:pointer" onclick="goView('cli')"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Clientes</div><div class="list-meta">${clients().length} con historial de compras</div></div>${ico('arrow-right')}</div>
  <div class="list-row" style="cursor:pointer" onclick="goView('gastos')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">Gastos</div><div class="list-meta">${money(mExp)} este mes${gPendN?' · '+gPendN+' por pagar':''}</div></div>${ico('arrow-right')}</div>
+ <div class="list-row" style="cursor:pointer" onclick="goView('creditos')"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Créditos</div><div class="list-meta">${fCobrar()?money(fCobrar())+' por cobrar':'Sin deudas pendientes'}</div></div>${ico('arrow-right')}</div>
+ <div class="list-row" style="cursor:pointer" onclick="goView('caja')"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">Cierre de caja</div><div class="list-meta">${(db.cierres||[]).some(c=>c.fecha===dISO(0))?'Día cerrado':'Falta cerrar el día'}</div></div>${ico('arrow-right')}</div>
  </div>${LOGO?`<div class="panel-sub" style="margin-top:12px">Logo de la tienda cargado</div>`:''}</section>`;
  $('#app').innerHTML=head+kpis+`<div class="dash-grid">${chart}${donut}${topPanel}${lowPanel}${recentPanel}${mini}</div>`;
 }
@@ -1511,7 +1519,7 @@ async function exportDb(){
  try{await dl.save({filename:'gl-multitienda-respaldo-'+new Date().toISOString().slice(0,10)+'.json',data:JSON.stringify({...db,logo:LOGO})})}
  catch(e){if(!e||e.code!=='declined')alert('No se pudo guardar el respaldo: '+((e&&e.message)||'error'))}
 }
-function importDb(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.parts)throw 0;if(confirm('Esto reemplazará los datos actuales. ¿Continuar?')){db=d;db.notes=d.notes||[];commit(d.parts.map(p=>({ts:0,...p})),db.notes);render()}}catch(e){alert('Archivo no válido')}};r.readAsText(f)}
+function importDb(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.parts)throw 0;if(confirm('Esto reemplazará los datos actuales. ¿Continuar?')){db=d;db.notes=d.notes||[];db.creditos=d.creditos||[];db.cierres=d.cierres||[];commit(d.parts.map(p=>({ts:0,...p})),db.notes);if(R){db.creditos.forEach(x=>R.doc('creditos/'+x.id).set(JSON.parse(JSON.stringify(x))).catch(se));db.cierres.forEach(c=>R.doc('cierres/'+c.fecha).set(JSON.parse(JSON.stringify(c))).catch(se))}else save();render()}}catch(e){alert('Archivo no válido')}};r.readAsText(f)}
 
 /* ---------- VENDER ---------- */
 function renderSell(){
@@ -1547,16 +1555,24 @@ function renderCart(){
  ${lbl('Teléfono (opcional)')}<input id="c_ph" value="${esc(client.phone)}" oninput="client.phone=this.value" inputmode="tel">
  <datalist id="dl_ci">${CL.map(c=>c.ci?`<option value="${esc(c.ci)}">${esc(c.name)}</option>`:'').join('')}</datalist><datalist id="dl_nm">${CL.map(c=>`<option value="${esc(c.name)}">${esc(c.ci)}</option>`).join('')}</datalist>
  ${lbl('Tipo de precio')}<select onchange="setTier(this.value)"><option value="bcv" ${payTier==='bcv'?'selected':''}>$ BCV</option><option value="cash" ${payTier==='cash'?'selected':''}>$ CASH</option></select>
- ${lbl('Forma de pago')}<select onchange="payMethod=this.value">${PAYS.map(x=>`<option ${x===payMethod?'selected':''}>${x}</option>`).join('')}</select>
- <div class="cart-total"><span>Total a cobrar</span><b>${money(total())}</b></div>${bsBox()}
+ ${lbl('Forma de pago')}<select onchange="payMethod=this.value;renderCart()">${PAYS.map(x=>`<option ${x===payMethod?'selected':''}>${x}</option>`).join('')}</select>
+ ${payMethod==='Crédito'?`<div class="notice-bar" style="margin-top:8px">${ico('users')}<span>Venta a crédito: se guarda en Créditos y podrás registrar abonos hasta saldarla. Escribe el nombre del cliente.</span></div>
+ ${lbl('Vence (opcional)')}<input id="c_vence" type="date" value="${ventaVence}" onchange="ventaVence=this.value">`:''}
+ <div class="cart-total"><span>${payMethod==='Crédito'?'Total a crédito':'Total a cobrar'}</span><b>${money(total())}</b></div>${payMethod==='Crédito'?'':bsBox()}
  <button class="btn ok wide" style="margin-top:12px" ${cart.length?'':'disabled'} onclick="checkout()">${ico('check')} Vender y generar nota</button></div>`;
 }
 function checkout(){
  for(const c of cart){const p=find(c.id);if(c.qty>p.stock){alert(`Stock insuficiente de ${p.name}`);return}}
+ if(payMethod==='Crédito'&&!client.name.trim()){alert('Escribe el nombre del cliente para registrar el crédito.');return}
  const ps=[],items=cart.map(c=>{const p=find(c.id);p.stock-=c.qty;ps.push([p.id,{stock:p.stock}]);return{id:c.id,name:p.name,code:p.code,qty:c.qty,price:c.price,cost:p.cost||0}});
  const n={no:Math.max(SEQ,0,...db.notes.map(x=>x.no))+1,date:new Date().toISOString(),client:client.name.trim()||'Cliente general',phone:client.phone,ci:(client.ci||'').trim(),pay:payMethod,tier:payTier,rate:RATE||0,bs:bsNow(),items,total:total()};
  db.notes.unshift(n);SEQ=n.no;
  if(R){R.doc('config/seq').set({n:SEQ}).catch(se);patchParts(ps);commit([],[n])}else if(!save())return;
+ if(payMethod==='Crédito'){
+  const f={id:uid(),ts:Date.now(),fecha:dISO(0),no:n.no,cliente:n.client,ci:n.ci,phone:n.phone,total:n.total,vence:ventaVence||'',nota:'',abonos:[]};
+  db.creditos=(db.creditos||[]).concat(f);syncCredito(f);
+ }
+ ventaVence='';
  cart=[];client={name:'',phone:'',ci:''};bsMan=null;renderSell();showNote(n.no);
 }
 
@@ -1849,6 +1865,7 @@ function editGasto(id){
  <label style="display:block;margin-top:12px">Nota (opcional)</label>
  <input id="g_nota" value="${esc(d.nota||'')}" placeholder="Ej: pagado en efectivo">
  <label style="display:flex;align-items:center;gap:9px;margin-top:14px;font-weight:600;font-size:13px"><input type="checkbox" id="g_pag" ${d.pagado?'checked':''}> Ya está pagado</label>
+ <label style="display:block;margin-top:10px">Pagado con</label><select id="g_met">${CJ_MET.map(k=>`<option ${k===(d.met||'Efectivo')?'selected':''}>${k}</option>`).join('')}</select>
  <div class="row" style="margin-top:16px"><button class="btn ok" onclick="saveGasto()">${ico('check')} Guardar</button><button class="btn g" onclick="closeM()">Cancelar</button></div>`;
  $('#modal').classList.add('on');
  gEq();
@@ -1859,7 +1876,7 @@ function saveGasto(){
  if(!desc){alert('Escribe una descripción del gasto.');return}
  if(!(monto>0)){alert('Escribe un monto mayor a cero.');return}
  const mon=$('#g_mon').value,pagado=$('#g_pag').checked;
- const o={id:g.id||uid(),ts:g.ts||Date.now(),desc,cat:$('#g_cat').value,tipo:$('#g_tipo').value,fecha:$('#g_fecha').value||dISO(0),vence:$('#g_vence').value||'',monto,mon,usd:mon==='Bs'?(RATE?Math.round(monto/RATE*100)/100:monto):monto,pagado,pago:pagado?(g.pago||dISO(0)):null,nota:($('#g_nota').value||'').trim()};
+ const o={id:g.id||uid(),ts:g.ts||Date.now(),desc,cat:$('#g_cat').value,tipo:$('#g_tipo').value,fecha:$('#g_fecha').value||dISO(0),vence:$('#g_vence').value||'',monto,mon,usd:mon==='Bs'?(RATE?Math.round(monto/RATE*100)/100:monto):monto,pagado,pago:pagado?(g.pago||dISO(0)):null,met:$('#g_met').value||'Efectivo',nota:($('#g_nota').value||'').trim()};
  db.gastos=(db.gastos||[]).filter(x=>x.id!==o.id).concat(o);
  if(R)R.doc('gastos/'+o.id).set(JSON.parse(JSON.stringify(o))).catch(se);else save();
  closeM();render();toast(g.id?'Gasto actualizado':'Gasto registrado');
@@ -1870,7 +1887,7 @@ function showGasto(id){
  <div class="mu" style="margin-top:4px">${esc(g.cat||'Otros')} · ${g.tipo==='fijo'?'Gasto fijo':'Gasto variable'}</div>
  <div class="mu" style="margin-top:12px">Monto: <b style="color:var(--tx);font-size:19px">${money(gUsd(g))}</b>${g.mon==='Bs'?` <span>· Bs ${bsf(g.monto)}</span>`:''}</div>
  <div class="mu" style="margin-top:8px">Fecha: <b>${fFec(g.fecha)}</b></div>
- <div style="margin-top:10px">${gEstado(g)}</div>
+ <div style="margin-top:10px">${gEstado(g)}${g.pagado?' · '+esc(g.met||'Efectivo'):''}</div>
  ${g.nota?`<div class="mu" style="margin-top:10px">${esc(g.nota)}</div>`:''}
  <div class="row" style="margin-top:16px">
   ${g.pagado?`<button class="btn g" onclick="pagaGasto('${g.id}',false)">${ico('refresh')} Marcar pendiente</button>`:`<button class="btn ok" onclick="pagaGasto('${g.id}',true)">${ico('check')} Marcar pagado</button>`}
@@ -1902,6 +1919,289 @@ function delGasto(id){
  closeM();render();toast('Gasto borrado');
 }
 
+/* ---------- CRÉDITOS (CUENTAS POR COBRAR) ---------- */
+function fAbonado(f){return (f.abonos||[]).reduce((a,x)=>a+(+x.usd||0),0)}
+function fSaldo(f){return Math.max(0,Math.round(((+f.total||0)-fAbonado(f))*100)/100)}
+function fPagado(f){return fSaldo(f)<=0.009}
+function fVencido(f){return !fPagado(f)&&!!f.vence&&diasVence(f.vence)<0}
+function fPendList(){return (db.creditos||[]).filter(f=>!fPagado(f))}
+function fCobrar(){return Math.round(fPendList().reduce((t,f)=>t+fSaldo(f),0)*100)/100}
+function fClientes(){const m=new Map();fPendList().forEach(f=>{const k=f.ci?nz(f.ci).replace(/[^a-z0-9]/g,''):'n:'+nz(f.cliente);m.set(k,Math.round(((m.get(k)||0)+fSaldo(f))*100)/100)});return m}
+function syncCredito(f){if(R)R.doc('creditos/'+f.id).set(JSON.parse(JSON.stringify(f))).catch(se);else save()}
+function setFF(v){fFil=v;renderCreditos()}
+function fRow(f){
+ const s=fSaldo(f),p=fPagado(f),v=fVencido(f);
+ return `<div class="doc-row" onclick="showCredito('${f.id}')"><div class="doc-ico ${p?'ok':'warn'}">${ico('users')}</div>
+ <div class="doc-main"><div class="doc-title">${esc(f.cliente)}${f.no?' · Nota N.º '+String(f.no).padStart(5,'0'):''}</div>
+ <div class="doc-meta"><span>${fFec(f.fecha)}</span>${f.vence?`<span>·</span><span>Vence ${fFec(f.vence)}</span>`:''}${p?'<span class="badge ok">Pagado</span>':v?'<span class="badge danger">Vencido</span>':'<span class="badge warn">Pendiente</span>'}</div>
+ <div class="doc-meta" style="margin-top:5px"><span>Abonado ${money(fAbonado(f))}</span><span>·</span><span>Total ${money(f.total)}</span></div></div>
+ <div class="doc-amount">${money(s)}</div></div>`;
+}
+function renderCreditos(){
+ const all=db.creditos||[],pend=fPendList();
+ const tot=fCobrar(),ven=pend.filter(fVencido),venTot=Math.round(ven.reduce((t,f)=>t+fSaldo(f),0)*100)/100;
+ const now=new Date(),mS=new Date(now.getFullYear(),now.getMonth(),1),mE=new Date(now.getFullYear(),now.getMonth()+1,1);
+ let cobMes=0;all.forEach(f=>(f.abonos||[]).forEach(x=>{const d=new Date(String(x.fecha||'')+'T00:00:00');if(!isNaN(d)&&d>=mS&&d<mE)cobMes+=(+x.usd||0)}));
+ cobMes=Math.round(cobMes*100)/100;
+ const mes=dISO(0).slice(0,7),fMes=all.filter(f=>String(f.fecha||'').slice(0,7)===mes),fMesTot=Math.round(fMes.reduce((t,f)=>t+(+f.total||0),0)*100)/100;
+ const cli=fClientes().size;
+ const kpis=`<div class="kpi-grid">
+  <div class="kpi warn"><div class="kpi-icon">${ico('users')}</div><div class="kpi-label">Por cobrar</div><div class="kpi-value">${money(tot)}</div><div class="kpi-foot"><span>${pend.length} ${pl(pend.length,'crédito abierto','créditos abiertos')}</span><span>·</span><span>${cli} ${pl(cli,'cliente','clientes')}</span></div></div>
+  <div class="kpi"><div class="kpi-icon">${ico('alert')}</div><div class="kpi-label">Vencido</div><div class="kpi-value">${money(venTot)}</div><div class="kpi-foot">${ven.length?`<span class="badge danger">${ven.length} ${pl(ven.length,'vencido','vencidos')}</span>`:'<span class="badge ok">Sin atrasos</span>'}</div></div>
+  <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Cobrado este mes</div><div class="kpi-value">${money(cobMes)}</div><div class="kpi-foot"><span>Abonos registrados</span></div></div>
+  <div class="kpi purple"><div class="kpi-icon">${ico('receipt')}</div><div class="kpi-label">Crédito del mes</div><div class="kpi-value">${money(fMesTot)}</div><div class="kpi-foot"><span>${fMes.length} ${pl(fMes.length,'crédito','créditos')}</span></div></div>
+ </div>`;
+ const L=all.filter(f=>fFil==='pend'?!fPagado(f):fFil==='ven'?fVencido(f):fFil==='pag'?fPagado(f):true).sort((x,y)=>{
+  const px=fPagado(x),py=fPagado(y);if(px!==py)return px?1:-1;
+  if(!px){if(x.vence&&y.vence&&x.vence!==y.vence)return x.vence.localeCompare(y.vence);if(x.vence&&!y.vence)return -1;if(!x.vence&&y.vence)return 1}
+  return String(y.fecha).localeCompare(String(x.fecha))||((y.ts||0)-(x.ts||0))});
+ const html=L.length?`<div class="list-card">${L.map(fRow).join('')}</div>`:`<div class="empty-state"><div class="empty-ico">${ico('users')}</div><h3>${fFil==='pag'?'Sin créditos pagados':'Sin créditos pendientes'}</h3><p>${all.length?'Ningún crédito coincide con este filtro.':'Cuando vendas a crédito, la deuda queda aquí y puedes registrar abonos hasta saldarla.'}</p><button class="btn ok" onclick="editCredito()">${ico('plus')} Nuevo crédito</button></div>`;
+ $('#app').innerHTML=`<div class="page-toolbar"><div class="seg">${[['pend','Pendientes'],['ven','Vencidos'],['pag','Pagados'],['all','Todos']].map(([k,l])=>`<button class="${fFil===k?'on':''}" onclick="setFF('${k}')">${l}</button>`).join('')}</div><div class="toolbar-actions"><button class="btn ok" onclick="editCredito()">${ico('plus')} Nuevo crédito</button></div></div>
+ ${kpis}${html}`;
+}
+function showCredito(id){
+ const f=(db.creditos||[]).find(x=>x.id===id);if(!f)return;
+ const s=fSaldo(f),ab=fAbonado(f),v=fVencido(f);
+ const abL=(f.abonos||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))||((b.ts||0)-(a.ts||0)));
+ const abHtml=abL.length?abL.map(x=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${money(x.usd)}${x.mon==='Bs'?` <span class="mu">· Bs ${bsf(x.monto)}</span>`:''}</div><div class="list-meta">${fFec(x.fecha)} · ${esc(x.met||'Efectivo')}${x.nota?' · '+esc(x.nota):''}</div></div><button class="btn s g" onclick="delAbono('${f.id}','${x.id}')" aria-label="Borrar abono" title="Borrar abono">${ico('trash')}</button></div>`).join(''):`<div class="empty-mini">${ico('dollar')}<span>Todavía no hay abonos</span></div>`;
+ $('#box').innerHTML=`<h3 style="margin:0;display:flex;align-items:center;gap:8px">${ico('users')} ${esc(f.cliente)}</h3>
+ <div class="mu" style="margin-top:4px">${f.no?'Crédito de la nota N.º '+String(f.no).padStart(5,'0')+' · ':''}${f.ci?'C.I. '+esc(f.ci)+' · ':''}${f.phone?esc(f.phone):''}</div>
+ <div class="mini-stats" style="margin-top:12px"><div class="mini-stat"><span>Total</span><b>${money(f.total)}</b></div><div class="mini-stat"><span>Abonado</span><b>${money(ab)}</b></div><div class="mini-stat"><span>Saldo</span><b style="color:${s>0?'var(--wa)':'var(--ok)'}">${money(s)}</b></div></div>
+ <div class="mu">${fPagado(f)?'<span class="badge ok">Pagado completo</span>':v?`<span class="badge danger">Vencido hace ${-diasVence(f.vence)} día${-diasVence(f.vence)===1?'':'s'}</span>`:f.vence?`<span class="badge warn">Vence ${fFec(f.vence)}</span>`:'<span class="badge warn">Sin vencimiento</span>'}</div>
+ ${f.nota?`<div class="mu" style="margin-top:8px">${esc(f.nota)}</div>`:''}
+ ${(f.items||[]).length?`<div class="panel-sub" style="margin-top:14px">Repuestos que se llevó</div><div class="list">${f.items.map(i=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('box')}</div><div class="list-main"><div class="list-title">${esc(i.name)}</div><div class="list-meta">${i.qty} × ${money(i.price)}${i.code?' · '+esc(i.code):''}</div></div><div class="list-amount">${money(i.qty*i.price)}</div></div>`).join('')}</div>`:''}
+ <div class="panel-sub" style="margin-top:14px">Abonos</div><div class="list">${abHtml}</div>
+ <div class="row" style="margin-top:14px">${s>0?`<button class="btn ok" onclick="addAbono('${f.id}')">${ico('dollar')} Registrar abono</button>`:''}${s>0&&f.phone?`<button class="btn g" onclick="waCredito('${f.id}')">${ico('users')} Recordar</button>`:''}${f.no?`<button class="btn g" onclick="showNote(${f.no})">${ico('receipt')} Ver nota</button>`:''}<button class="btn g" onclick="editCredito('${f.id}')">${ico('edit')} Editar</button><button class="btn danger" onclick="delCredito('${f.id}')">${ico('trash')} Borrar</button></div>
+ <div class="row" style="margin-top:8px"><button class="btn g wide" onclick="closeM()">Cerrar</button></div>`;
+ $('#modal').classList.add('on');
+}
+function addAbono(id){
+ const f=(db.creditos||[]).find(x=>x.id===id);if(!f)return;
+ window._abF=id;
+ $('#box').innerHTML=`<h3 style="margin:0;display:flex;align-items:center;gap:8px">${ico('dollar')} Registrar abono</h3>
+ <div class="mu" style="margin-top:4px">${esc(f.cliente)} · saldo ${money(fSaldo(f))}</div>
+ <label style="display:block;margin-top:14px">Monto</label>
+ <div style="display:flex;gap:10px"><div style="flex:1"><input id="ab_monto" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00"></div><div style="width:92px"><select id="ab_mon"><option value="$">$</option><option value="Bs">Bs</option></select></div></div>
+ <label style="display:block;margin-top:10px">Método</label><select id="ab_met">${CJ_MET.map(k=>`<option>${k}</option>`).join('')}</select>
+ <label style="display:block;margin-top:10px">Fecha</label><input id="ab_fecha" type="date" value="${dISO(0)}">
+ <label style="display:block;margin-top:10px">Nota (opcional)</label><input id="ab_nota" placeholder="Ej: abono semanal" autocomplete="off">
+ <div class="row" style="margin-top:16px"><button class="btn ok" onclick="saveAbono()">${ico('check')} Guardar abono</button><button class="btn g" onclick="showCredito('${f.id}')">Volver</button></div>`;
+ $('#modal').classList.add('on');
+}
+function saveAbono(){
+ const f=(db.creditos||[]).find(x=>x.id===window._abF);if(!f)return;
+ const monto=+($('#ab_monto').value||0),mon=$('#ab_mon').value;
+ if(!(monto>0)){alert('Escribe un monto mayor a cero.');return}
+ const usd=mon==='Bs'?(RATE?monto/RATE:monto):monto,r=Math.round(usd*100)/100,sal=fSaldo(f);
+ if(r>sal+0.01&&!confirm('El abono ('+money(r)+') es mayor que el saldo ('+money(sal)+'). ¿Registrarlo igual?'))return;
+ f.abonos=(f.abonos||[]).concat({id:uid(),ts:Date.now(),fecha:$('#ab_fecha').value||dISO(0),monto,mon,usd:r,met:$('#ab_met').value,nota:($('#ab_nota').value||'').trim()});
+ syncCredito(f);
+ if(view==='creditos')renderCreditos();
+ showCredito(f.id);
+ toast(fPagado(f)?'Crédito pagado por completo':'Abono registrado');
+}
+function delAbono(id,aid){
+ const f=(db.creditos||[]).find(x=>x.id===id);if(!f)return;
+ if(!confirm('¿Borrar este abono?'))return;
+ f.abonos=(f.abonos||[]).filter(x=>x.id!==aid);
+ syncCredito(f);
+ if(view==='creditos')renderCreditos();
+ showCredito(f.id);toast('Abono borrado');
+}
+function fiCartList(){return window._fiCart||(window._fiCart=[])}
+function fiOldQty(id){const d=window._fEdit,it=((d&&d.items)||[]).find(x=>x.id===id);return it?(+it.qty||0):0}
+function fiAvail(id){const p=find(id);return p?Math.max(0,(+p.stock||0)+fiOldQty(id)):0}
+function fiSum(){return Math.round(fiCartList().reduce((t,c)=>t+c.qty*c.price,0)*100)/100}
+function fiSetQ(v){window._fiQ=v||'';fiResults()}
+function fiResults(){
+ const box=document.getElementById('fi_res');if(!box)return;
+ const q=nz(window._fiQ||'').trim();
+ const L=db.parts.filter(p=>!q||nz(p.name+' '+(p.code||'')+' '+(p.brand||'')).includes(q)).slice(0,6);
+ box.innerHTML=L.length?L.map(p=>{const av=fiAvail(p.id),have=fiCartList().some(c=>c.id===p.id);
+  return `<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title" style="font-size:12.5px">${esc(p.name)}</div><div class="list-meta">${esc(p.code||'Sin código')} · ${money(pr(p,'bcv'))} · ${av?av+(av===1?' disponible':' disponibles'):'agotado'}</div></div><button class="btn s ${have?'g':'ok'}" ${av?'':'disabled'} onclick="fiAdd('${p.id}')" aria-label="Agregar ${esc(p.name)}">${ico('plus')}</button></div>`}).join(''):`<div class="empty-mini">${ico('search')}<span>Sin resultados</span></div>`;
+}
+function fiPaint(){
+ const L=fiCartList(),box=document.getElementById('fi_pick');
+ if(box)box.innerHTML=L.length?L.map(c=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title" style="font-size:12.5px">${esc(c.name)}</div><div class="list-meta">${money(c.price)} c/u · ${money(c.price*c.qty)}</div></div><div class="qty"><button onclick="fiQty('${c.id}',${c.qty-1})" aria-label="Quitar uno">−</button><input type="number" value="${c.qty}" onchange="fiQty('${c.id}',this.value)" aria-label="Cantidad"><button onclick="fiQty('${c.id}',${c.qty+1})" aria-label="Agregar uno">+</button></div><button class="btn s g" onclick="fiRm('${c.id}')" aria-label="Quitar">${ico('x')}</button></div>`).join(''):`<div class="empty-mini">${ico('box')}<span>Todavía no agregaste repuestos</span></div>`;
+ const sub=document.getElementById('fi_sub');
+ if(sub)sub.textContent=L.length?'Subtotal '+money(fiSum())+' · '+L.reduce((t,c)=>t+c.qty,0)+' unidades':'';
+ const tot=document.getElementById('fi_tot');
+ if(tot&&!window._fiTotMan)tot.value=L.length?fiSum().toFixed(2):'';
+ const nt=document.getElementById('fi_nota');
+ if(nt&&!nt.dataset.man)nt.value=L.length?L.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', '):'';
+ fiResults();
+}
+function fiAdd(id){
+ const p=find(id);if(!p)return;
+ const L=fiCartList(),c=L.find(x=>x.id===id),av=fiAvail(id);
+ if((c?c.qty:0)>=av){toast('No hay más stock disponible de '+p.name);return}
+ if(c)c.qty++;else L.push({id,name:p.name,code:p.code||'',qty:1,price:Math.round((+(pr(p,'bcv')||0))*100)/100,cost:+p.cost||0});
+ fiPaint();
+}
+function fiQty(id,q){
+ const L=fiCartList(),i=L.findIndex(x=>x.id===id);if(i<0)return;
+ const av=fiAvail(id),n=Math.round(+q||0);
+ if(!(n>0))L.splice(i,1);else L[i].qty=Math.min(n,Math.max(1,av));
+ fiPaint();
+}
+function fiRm(id){window._fiCart=fiCartList().filter(x=>x.id!==id);fiPaint()}
+function editCredito(id){
+ const f=id?(db.creditos||[]).find(x=>x.id===id):null;
+ const d=f?{...f}:{id:uid(),cliente:'',ci:'',phone:'',total:'',fecha:dISO(0),vence:'',nota:'',no:null,abonos:[],items:[]};
+ window._fEdit=d;
+ window._fiCart=d.no?[]:(d.items||[]).map(i=>({id:i.id,name:i.name,code:i.code||'',qty:+i.qty||1,price:+i.price||0,cost:+i.cost||0}));
+ window._fiTotMan=!!(+d.total>0);window._fiQ='';
+ const picker=d.no?'':`<div class="panel-sub" style="margin-top:14px">Repuestos que se llevó</div>
+ <div class="search-field" style="margin-top:6px">${ico('search')}<input id="fi_q" type="search" autocomplete="off" placeholder="Buscar repuesto por nombre, código o marca…" oninput="fiSetQ(this.value)"></div>
+ <div id="fi_res" class="list" style="margin-top:6px;max-height:230px;overflow:auto"></div>
+ <div id="fi_pick" class="list" style="margin-top:8px"></div>
+ <div class="mu" id="fi_sub" style="margin-top:6px"></div>`;
+ $('#box').innerHTML=`<h3 style="margin:0;display:flex;align-items:center;gap:8px">${ico('users')} ${f?'Editar crédito':'Nuevo crédito'}</h3>
+ <div class="mu" style="margin-top:4px">${d.no?'Crédito de la nota N.º '+String(d.no).padStart(5,'0')+': los repuestos ya se descontaron al vender.':'Agrega los repuestos que se llevó: se descuentan del inventario.'}</div>
+ <label style="display:block;margin-top:14px">Cliente</label><input id="fi_cli" value="${esc(d.cliente)}" placeholder="Nombre del cliente" list="dl_nm_f" autocomplete="off">
+ <datalist id="dl_nm_f">${clients().map(c=>`<option value="${esc(c.name)}">${esc(c.ci)}</option>`).join('')}</datalist>
+ <div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label>Cédula</label><input id="fi_ci" value="${esc(d.ci||'')}" placeholder="V-12345678" autocomplete="off"></div><div style="flex:1"><label>Teléfono</label><input id="fi_ph" value="${esc(d.phone||'')}" inputmode="tel" autocomplete="off"></div></div>
+ ${picker}
+ <div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label>Total a deber ($)</label><input id="fi_tot" type="number" step="0.01" min="0" inputmode="decimal" value="${d.total===''?'':d.total}" placeholder="0,00" oninput="window._fiTotMan=true"></div></div>
+ <div style="display:flex;gap:10px;margin-top:10px"><div style="flex:1"><label>Fecha</label><input id="fi_fecha" type="date" value="${d.fecha||dISO(0)}"></div><div style="flex:1"><label>Vence (opcional)</label><input id="fi_vence" type="date" value="${d.vence||''}"></div></div>
+ <label style="display:block;margin-top:10px">¿Qué se llevó a crédito? (opcional)</label><input id="fi_nota" value="${esc(d.nota||'')}" ${d.nota?'data-man="1"':''} placeholder="Ej: aceite 5W-30 y filtro de aire" autocomplete="off" oninput="this.dataset.man='1'">
+ <div class="row" style="margin-top:16px"><button class="btn ok" onclick="saveCredito()">${ico('check')} Guardar</button><button class="btn g" onclick="${f?`showCredito('${f.id}')`:'closeM()'}">Cancelar</button></div>`;
+ $('#modal').classList.add('on');
+ fiPaint();
+}
+function saveCredito(){
+ const d=window._fEdit;if(!d)return;
+ const cliente=($('#fi_cli').value||'').trim();
+ if(!cliente){alert('Escribe el nombre del cliente.');return}
+ const items=d.no?[]:fiCartList().map(c=>({id:c.id,name:c.name,code:c.code,qty:c.qty,price:c.price,cost:c.cost||0}));
+ const old=new Map(((d.items)||[]).map(i=>[i.id,+i.qty||0]));
+ for(const i of items){const p=find(i.id);if(!p)continue;if(i.qty-(old.get(i.id)||0)>(+p.stock||0)){alert('No hay stock suficiente de '+p.name+' (quedan '+p.stock+').');return}}
+ let tot=+($('#fi_tot').value||0);
+ if(!(tot>0)&&items.length)tot=fiSum();
+ if(!(tot>0)){alert('Escribe un total mayor a cero o agrega repuestos.');return}
+ const ps=[];
+ items.forEach(i=>{const p=find(i.id);if(!p)return;const delta=i.qty-(old.get(i.id)||0);if(!delta)return;p.stock=Math.max(0,(+p.stock||0)-delta);ps.push([p.id,{stock:p.stock}])});
+ old.forEach((q,id)=>{if(items.some(i=>i.id===id))return;const p=find(id);if(!p)return;p.stock=(+p.stock||0)+q;ps.push([p.id,{stock:p.stock}])});
+ const o={id:d.id,ts:d.ts||Date.now(),cliente,ci:($('#fi_ci').value||'').trim(),phone:($('#fi_ph').value||'').trim(),total:tot,fecha:$('#fi_fecha').value||dISO(0),vence:$('#fi_vence').value||'',nota:($('#fi_nota').value||'').trim(),no:d.no||null,abonos:d.abonos||[],items,itemsTot:items.length?fiSum():0};
+ db.creditos=(db.creditos||[]).filter(x=>x.id!==o.id).concat(o);
+ syncCredito(o);
+ if(ps.length)patchParts(ps);
+ closeM();
+ if(view==='creditos')renderCreditos();
+ render();
+ toast(d.no?'Crédito actualizado':'Crédito registrado');
+}
+function delCredito(id){
+ const f=(db.creditos||[]).find(x=>x.id===id);if(!f)return;
+ if(!confirm('¿Borrar el crédito de '+f.cliente+'?'+(f.no?'\n\nLa nota N.º '+String(f.no).padStart(5,'0')+' no se borra.':'')+(fAbonado(f)>0?'\n\nSe perderá el historial de '+money(fAbonado(f))+' en abonos.':'')))return;
+ db.creditos=(db.creditos||[]).filter(x=>x.id!==id);
+ if((f.items||[]).length&&!f.no&&confirm('¿Devolver los repuestos de este crédito al inventario?\n\nAceptar = vuelven al stock. Cancelar = el stock se queda como está.')){
+  const ps=[];f.items.forEach(i=>{const p=find(i.id);if(!p)return;p.stock=(+p.stock||0)+(+i.qty||0);ps.push([p.id,{stock:p.stock}])});
+  if(ps.length)patchParts(ps);
+ }
+ if(R)R.doc('creditos/'+id).delete().catch(se);else save();
+ closeM();
+ if(view==='creditos')renderCreditos();
+ toast('Crédito borrado');
+}
+function waCredito(id){
+ const f=(db.creditos||[]).find(x=>x.id===id);if(!f)return;
+ let t='*GL Multitienda*\nHola '+f.cliente+', le recordamos su saldo pendiente de '+money(fSaldo(f));
+ if(f.no)t+=' de la nota N.º '+String(f.no).padStart(5,'0');
+ if(f.vence)t+='\nVence: '+fFec(f.vence);
+ t+='\n\nCualquier duda, con gusto le atendemos.';
+ const ph=waNum(f.phone);
+ window.open('https://wa.me/'+(ph?ph+'?text=':'?text=')+encodeURIComponent(t),'_blank');
+}
+
+/* ---------- CIERRE DE CAJA ---------- */
+const CJ_MET=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro'];
+let cajaDay=dISO(0);
+function diaRange(day){const a=new Date(String(day)+'T00:00:00');const b=new Date(a);b.setDate(b.getDate()+1);return[a,b]}
+function cajaData(day){
+ const[a,b]=diaRange(day);
+ const ns=db.notes.filter(n=>!n.void&&new Date(n.date)>=a&&new Date(n.date)<b);
+ const ventas={},abonos={};let ventasTot=0,creditoTot=0;
+ ns.forEach(n=>{const t=+n.total||0;ventasTot+=t;
+  if(n.pay==='Crédito'){creditoTot+=t;return}
+  const k=CJ_MET.includes(n.pay)?n.pay:'Otro';ventas[k]=(ventas[k]||0)+t});
+ let abonosTot=0;
+ (db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')!==day)return;const k=CJ_MET.includes(x.met)?x.met:'Efectivo';abonos[k]=(abonos[k]||0)+(+x.usd||0);abonosTot+=(+x.usd||0)}));
+ const gLs=(db.gastos||[]).filter(g=>g.pagado&&String(g.pago||'')===day);
+ const gastos=Math.round(gLs.reduce((t,g)=>t+gUsd(g),0)*100)/100;
+ const esp={};CJ_MET.forEach(k=>esp[k]=Math.round(((ventas[k]||0)+(abonos[k]||0))*100)/100);
+ gLs.forEach(g=>{const k=CJ_MET.includes(g.met)?g.met:'Efectivo';esp[k]=Math.round((esp[k]-gUsd(g))*100)/100});
+ const esperado=Math.round(CJ_MET.reduce((t,k)=>t+esp[k],0)*100)/100;
+ return{ns,ventas,ventasTot:Math.round(ventasTot*100)/100,creditoTot:Math.round(creditoTot*100)/100,abonos,abonosTot:Math.round(abonosTot*100)/100,gastos,gLs,esp,esperado};
+}
+function setCajaDay(v){cajaDay=v||dISO(0);renderCaja()}
+function cajaHoy(){setCajaDay(dISO(0))}
+function cajaCalc(){
+ const esp=window._cjEsp||{};let te=0,tt=0,td=0,any=false;
+ CJ_MET.forEach((k,i)=>{const inp=document.getElementById('cj_'+i),raw=inp?String(inp.value).trim():'',has=raw!=='';
+  const v=Math.round((+(raw||0))*100)/100,e=+(esp[k]||0),df=Math.round((v-e)*100)/100;
+  if(has){any=true;te+=e;tt+=v;td+=df}
+  const el=document.getElementById('cjd_'+i);
+  if(el){el.textContent=!has||df===0?'—':(df>0?'+':'−')+money(Math.abs(df));el.style.color=!has||df===0?'var(--mu)':df>0?'var(--ok)':'var(--danger)'}});
+ const t=$('#cj_tot');
+ if(t){
+  if(!any){t.textContent='Escribe lo contado en cada método para ver la diferencia.';t.style.color='var(--mu)'}
+  else{t.textContent='Contado '+money(tt)+' · Esperado '+money(te)+' · Diferencia '+((td>0?'+':td<0?'−':'')+money(Math.abs(td)));t.style.color=td===0?'var(--mu)':td>0?'var(--ok)':'var(--danger)'}
+ }
+}
+function renderCaja(){
+ const d=cajaData(cajaDay),saved=(db.cierres||[]).find(c=>c.fecha===cajaDay);
+ window._cjEsp=d.esp;
+ const cobrado=Math.round((d.ventasTot-d.creditoTot+d.abonosTot)*100)/100;
+ const kpis=`<div class="kpi-grid">
+  <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido del día</div><div class="kpi-value">${money(d.ventasTot)}</div><div class="kpi-foot"><span>${d.ns.length} ${pl(d.ns.length,'nota','notas')}</span>${d.creditoTot?`<span>· Crédito ${money(d.creditoTot)}</span>`:''}</div></div>
+  <div class="kpi"><div class="kpi-icon">${ico('users')}</div><div class="kpi-label">Cobrado</div><div class="kpi-value">${money(cobrado)}</div><div class="kpi-foot"><span>Ventas ${money(d.ventasTot-d.creditoTot)} + abonos ${money(d.abonosTot)}</span></div></div>
+  <div class="kpi warn"><div class="kpi-icon">${ico('wallet')}</div><div class="kpi-label">Gastos pagados</div><div class="kpi-value">${money(d.gastos)}</div><div class="kpi-foot"><span>${d.gLs.length} ${pl(d.gLs.length,'gasto','gastos')} del día</span></div></div>
+  <div class="kpi purple"><div class="kpi-icon">${ico('calc')}</div><div class="kpi-label">Esperado en caja</div><div class="kpi-value">${money(d.esperado)}</div><div class="kpi-foot">${saved?'<span class="badge ok">Cierre guardado</span>':'<span class="badge warn">Falta cerrar</span>'}</div></div>
+ </div>`;
+ const metRows=CJ_MET.filter(k=>d.ventas[k]||d.abonos[k]).map(k=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Ventas ${money(d.ventas[k]||0)}${d.abonos[k]?` · Abonos ${money(d.abonos[k])}`:''}</div></div><div class="list-amount">${money((d.ventas[k]||0)+(d.abonos[k]||0))}</div></div>`);
+ if(d.creditoTot)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Crédito</div><div class="list-meta">No entra a caja · queda por cobrar</div></div><div class="list-amount">${money(d.creditoTot)}</div></div>`);
+ if(d.gastos)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">Gastos pagados</div><div class="list-meta">Descontados de la caja esperada</div></div><div class="list-amount" style="color:var(--danger)">−${money(d.gastos)}</div></div>`);
+ const metHtml=metRows.length?metRows.join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin movimientos este día</span></div>`;
+ const abL=[];(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')===cajaDay)abL.push({...x,cliente:f.cliente})}));
+ abL.sort((a,b)=>(b.ts||0)-(a.ts||0));
+ const abHtml=abL.length?abL.map(x=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">${esc(x.cliente)}</div><div class="list-meta">${esc(x.met||'Efectivo')}${x.mon==='Bs'?` · Bs ${bsf(x.monto)}`:''}</div></div><div class="list-amount">${money(x.usd)}</div></div>`).join(''):`<div class="empty-mini">${ico('users')}<span>Sin abonos de créditos</span></div>`;
+ const gHtml=d.gLs.length?d.gLs.map(g=>`<div class="list-row" style="cursor:pointer" onclick="showGasto('${g.id}')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">${esc(g.desc)}</div><div class="list-meta">${esc(g.cat||'Otros')} · pagado ${fFec(g.pago)} · ${esc(g.met||'Efectivo')}</div></div><div class="list-amount">${money(gUsd(g))}</div></div>`).join(''):`<div class="empty-mini">${ico('wallet')}<span>Sin gastos pagados este día</span></div>`;
+ const arqRows=CJ_MET.map((k,i)=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Esperado ${money(d.esp[k]||0)}</div></div><div style="width:124px;flex:none"><input id="cj_${i}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${saved&&saved.contado&&saved.contado[k]!=null?saved.contado[k]:''}" oninput="cajaCalc()" aria-label="Contado en ${k}" style="margin:0"></div><div class="list-amount" id="cjd_${i}" style="min-width:82px;text-align:right">—</div></div>`).join('');
+ const hist=(db.cierres||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
+ const histHtml=hist.length?hist.map(c=>`<div class="list-row" style="cursor:pointer" onclick="setCajaDay('${c.fecha}')"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${fFec(c.fecha)}</div><div class="list-meta">Vendido ${money(c.ventasTot)} · Contado ${money(c.contadoTot||0)}</div></div><span class="badge ${c.difTotal===0?'ok':Math.abs(c.difTotal)<=1?'warn':'danger'}">${c.difTotal===0?'Cuadrado':(c.difTotal>0?'+':'−')+money(Math.abs(c.difTotal||0))}</span></div>`).join(''):`<div class="empty-mini">${ico('clock')}<span>Aún no hay cierres guardados</span></div>`;
+ $('#app').innerHTML=`<div class="page-toolbar"><div class="toolbar-actions" style="margin-left:0"><input type="date" value="${cajaDay}" onchange="setCajaDay(this.value)" style="width:auto;margin:0" aria-label="Día del cierre"><button class="btn g s" onclick="cajaHoy()">${ico('clock')} Hoy</button></div><div class="toolbar-actions"><button class="btn g s" onclick="waCierre()">${ico('users')} Enviar cierre</button></div></div>
+ ${kpis}
+ <div class="dash-grid">
+  <section class="panel span-6">${phead('Movimientos del día','Ventas, abonos y gastos')}<div class="list">${metHtml}</div></section>
+  <section class="panel span-6">${phead('Abonos cobrados',abL.length?money(d.abonosTot):'Sin abonos este día')}<div class="list">${abHtml}</div></section>
+  <section class="panel span-8">${phead('Arqueo de caja','Escribe lo contado por método. La diferencia se calcula sola.')}<div class="list">${arqRows}</div><div class="panel-sub" id="cj_tot" style="margin-top:10px">—</div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="saveCierre()">${ico('check')} ${saved?'Guardar de nuevo':'Guardar cierre'}</button></div></section>
+  <section class="panel span-4">${phead('Gastos pagados',d.gastos?money(d.gastos)+' del día':'Sin gastos')}<div class="list">${gHtml}</div></section>
+  <section class="panel span-12">${phead('Últimos cierres','Los 6 más recientes')}<div class="list">${histHtml}</div></section>
+ </div>`;
+ cajaCalc();
+}
+function saveCierre(){
+ const d=cajaData(cajaDay),contado={},dif={};let tt=0,td=0;
+ CJ_MET.forEach((k,i)=>{const v=Math.round((+((document.getElementById('cj_'+i)||{}).value||0))*100)/100;contado[k]=v;const df=Math.round((v-(d.esp[k]||0))*100)/100;dif[k]=df;tt+=v;td+=df});
+ const any=CJ_MET.some((k,i)=>String((document.getElementById('cj_'+i)||{}).value||'').trim()!=='');
+ if(!any&&!confirm('No escribiste lo contado en ningún método. Se guardará el cierre con 0 en caja. ¿Continuar?'))return;
+ const o={fecha:cajaDay,ts:Date.now(),ventas:d.ventas,ventasTot:d.ventasTot,creditoTot:d.creditoTot,abonos:d.abonos,abonosTot:d.abonosTot,gastos:d.gastos,esp:d.esp,esperado:d.esperado,contado,dif,contadoTot:Math.round(tt*100)/100,difTotal:Math.round(td*100)/100};
+ db.cierres=(db.cierres||[]).filter(c=>c.fecha!==cajaDay).concat(o);
+ if(R)R.doc('cierres/'+cajaDay).set(JSON.parse(JSON.stringify(o))).catch(se);else save();
+ toast('Cierre guardado');renderCaja();
+}
+function waCierre(){
+ const d=cajaData(cajaDay),saved=(db.cierres||[]).find(c=>c.fecha===cajaDay);
+ let t='*GL Multitienda · Cierre de caja*\n'+fFec(cajaDay)+'\n\n';
+ CJ_MET.forEach(k=>{const e=d.esp[k]||0,c=saved&&saved.contado?saved.contado[k]:null;if(e||c)t+='• '+k+': esperado '+money(e)+(c!=null?' · contado '+money(c):'')+'\n'});
+ if(d.creditoTot)t+='• Crédito: '+money(d.creditoTot)+' (por cobrar)\n';
+ if(d.gastos)t+='• Gastos pagados: −'+money(d.gastos)+'\n';
+ t+='\nVendido: '+money(d.ventasTot)+'\nCobrado: '+money(d.ventasTot-d.creditoTot+d.abonosTot)+'\nEsperado en caja: '+money(d.esperado);
+ if(saved)t+='\nDiferencia: '+((saved.difTotal>0?'+':saved.difTotal<0?'−':'')+money(Math.abs(saved.difTotal)));
+ window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
+}
+
 /* ---------- NOTAS ---------- */
 function zoom(id){const p=find(id);if(!p||!p.img)return;
  $('#box').innerHTML=`<img src="${p.img}" alt="" style="width:100%;max-height:75vh;object-fit:contain;border-radius:10px;background:var(--bg)"><div style="margin:10px 0"><b>${esc(p.name)}</b><div class="mu">${esc(p.code)}</div></div><button class="btn g" onclick="closeM()">Cerrar</button>`;
@@ -1918,9 +2218,10 @@ function renderNotes(){
 }
 function showNote(no){
  const n=db.notes.find(x=>x.no===no);
+ const fdo=(db.creditos||[]).find(x=>x.no===no);
  $('#box').innerHTML=`<div class="note"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h2>GL Multitienda</h2><div style="font-size:13px">Repuestos automotrices</div></div>${LOGO?`<img src="${LOGO.img}" style="max-height:70px;max-width:40%">`:''}</div>
  <h3 style="margin:12px 0 4px">NOTA DE ENTREGA N.º ${String(n.no).padStart(5,'0')}</h3>${n.void?'<div style="color:#b91c1c;font-weight:700">NOTA ANULADA</div>':''}
- <div style="font-size:14px">Fecha: ${new Date(n.date).toLocaleString('es')}<br>Cliente: <b>${esc(n.client)}</b>${n.ci?'<br>Cédula: '+esc(n.ci):''}${n.phone?'<br>Tel: '+esc(n.phone):''}${n.pay?'<br>Pago: '+esc(n.pay)+(n.tier?' · Precio '+(n.tier==='bcv'?'$ BCV':'$ CASH'):''):''}</div>
+ <div style="font-size:14px">Fecha: ${new Date(n.date).toLocaleString('es')}<br>Cliente: <b>${esc(n.client)}</b>${n.ci?'<br>Cédula: '+esc(n.ci):''}${n.phone?'<br>Tel: '+esc(n.phone):''}${n.pay?'<br>Pago: '+esc(n.pay)+(n.tier?' · Precio '+(n.tier==='bcv'?'$ BCV':'$ CASH'):''):''}${fdo?'<br>Crédito: saldo '+money(fSaldo(fdo))+(fdo.vence?' · vence '+fFec(fdo.vence):''):''}</div>
  <div style="overflow-x:auto"><table><tr><th>Cant.</th><th>Descripción</th><th class="r">P. unit.</th><th class="r">Importe</th></tr>
  ${n.items.map(i=>`<tr><td>${i.qty}</td><td>${esc(i.name)}<br><small>${esc(i.code)}</small></td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
  <tr><td colspan="3" class="r"><b>TOTAL</b></td><td class="r"><b>${money(n.total)}</b></td></tr>${n.bs>0?`<tr><td colspan="3" class="r"><b>TOTAL Bs</b></td><td class="r"><b>Bs ${bsf(n.bs)}</b></td></tr>`:''}</table></div>
@@ -1948,22 +2249,23 @@ function autoFill(by){
 }
 function renderCli(){$('#app').innerHTML=`<div class="page-toolbar">${search('Buscar cliente por nombre, cédula o teléfono…')}<span class="badge info">${clients().length} clientes</span></div><div id="list">${cliList()}</div>`}
 function cliList(){
- CL=clients();
+ CL=clients();const FD=fClientes();
  const l=CL.map((c,i)=>({c,i})).filter(({c})=>{const h=nz(c.name+' '+c.ci+' '+c.phone);return nz(q).split(/\s+/).filter(Boolean).every(w=>h.includes(w))});
  if(!l.length)return `<div class="empty-state"><div class="empty-ico">${ico('users')}</div><h3>${CL.length?'Sin resultados':'Aún no hay clientes'}</h3><p>${CL.length?'Ningún cliente coincide con la búsqueda.':'Se guardan automáticamente al generar notas con nombre o cédula.'}</p></div>`;
  return '<div class="client-grid">'+l.map(({c,i})=>{
-  const ini=(String(c.name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('')||'?').toUpperCase();
+  const ini=(String(c.name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('')||'?').toUpperCase(),deuda=FD.get(c.k)||0;
   return `<div class="client-card"><div class="client-top"><div class="client-avatar">${esc(ini)}</div><div style="min-width:0"><div class="client-name">${esc(c.name)}</div><div class="client-meta">${c.ci?'C.I. '+esc(c.ci):'Sin cédula'}${c.phone?' · '+esc(c.phone):''}</div></div></div>
- <div class="client-stats"><div><span>Compras</span><b>${c.n}</b></div><div><span>Total</span><b>${money(c.total)}</b></div><div><span>Última</span><b>${new Date(c.last).toLocaleDateString('es',{day:'2-digit',month:'short'})}</b></div></div>
+ <div class="client-stats"><div><span>Compras</span><b>${c.n}</b></div><div><span>Total</span><b>${money(c.total)}</b></div><div><span>${deuda?'Debe':'Última'}</span><b${deuda?' style="color:var(--wa)"':''}>${deuda?money(deuda):new Date(c.last).toLocaleDateString('es',{day:'2-digit',month:'short'})}</b></div></div>
  <div class="client-actions"><button class="btn s g" onclick="showClient(${i})">${ico('receipt')} Compras</button><button class="btn s" onclick="sellTo(${i})">${ico('cart')} Vender</button></div></div>`}).join('')+'</div>';
 }
 function showClient(i){
  const c=CL[i];if(!c)return;
  const ini=(String(c.name||'').trim().split(/\s+/).slice(0,2).map(w=>w[0]||'').join('')||'?').toUpperCase();
+ const deuda=fClientes().get(c.k)||0;
  $('#box').innerHTML=`<div style="display:flex;align-items:center;gap:11px;margin-bottom:10px"><div class="client-avatar">${esc(ini)}</div><div style="min-width:0"><h3 style="margin:0">${esc(c.name)}</h3><div class="mu">${c.ci?'C.I. '+esc(c.ci):'Sin cédula'}${c.phone?' · '+esc(c.phone):''}</div></div></div>
- <div class="mini-stats" style="margin-bottom:10px"><div class="mini-stat"><span>Compras</span><b>${c.n}</b></div><div class="mini-stat"><span>Total</span><b>${money(c.total)}</b></div></div>
+ <div class="mini-stats" style="margin-bottom:10px"><div class="mini-stat"><span>Compras</span><b>${c.n}</b></div><div class="mini-stat"><span>Total</span><b>${money(c.total)}</b></div>${deuda?`<div class="mini-stat"><span>Debe</span><b style="color:var(--wa)">${money(deuda)}</b></div>`:''}</div>
  <div class="list">${db.notes.filter(n=>c.notes.includes(n.no)).map(n=>`<div class="list-row" style="cursor:pointer" onclick="showNote(${n.no})"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">Nota N.º ${String(n.no).padStart(5,'0')}</div><div class="list-meta">${new Date(n.date).toLocaleString('es')}</div></div><div class="list-amount">${money(n.total)}</div></div>`).join('')}</div>
- <div class="row" style="margin-top:14px"><button class="btn" onclick="closeM();sellTo(${i})">${ico('cart')} Vender a este cliente</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
+ <div class="row" style="margin-top:14px">${deuda?`<button class="btn ok" onclick="closeM();goView('creditos')">${ico('users')} Ver créditos</button>`:''}<button class="btn" onclick="closeM();sellTo(${i})">${ico('cart')} Vender a este cliente</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
  $('#modal').classList.add('on');
 }
 function sellTo(i){const c=CL[i];if(!c)return;client={name:c.name,phone:c.phone,ci:c.ci};goView('sell')}
@@ -2013,20 +2315,25 @@ function waNum(v){
 }
 function voidNote(no){
  const n=db.notes.find(x=>x.no===no);if(!n||n.void)return;
+ if((db.creditos||[]).some(f=>f.no===no&&fAbonado(f)>0)){alert('Esta nota tiene abonos registrados en Créditos. Borra esos abonos antes de anularla.');return}
  if(!confirm('¿Anular la nota N.º '+String(no).padStart(5,'0')+'? El stock de sus repuestos volverá al inventario.'))return;
  const ids=[];let miss=0;
  for(const i of n.items){const p=(i.id&&find(i.id))||(i.code&&db.parts.find(x=>x.code===i.code))||db.parts.find(x=>x.name===i.name);
   if(p){p.stock+=i.qty;if(!ids.includes(p.id))ids.push(p.id)}else miss++}
  n.void=true;n.voidDate=new Date().toISOString();
  patchParts(ids.map(id=>[id,{stock:find(id).stock}]));commit([],[n]);
+ const fs=(db.creditos||[]).filter(f=>f.no===no);
+ if(fs.length){db.creditos=(db.creditos||[]).filter(f=>f.no!==no);fs.forEach(f=>R?R.doc('creditos/'+f.id).delete().catch(se):0);if(!R)save()}
  if(miss)alert(miss+' '+pl(miss,'repuesto ya no existe','repuestos ya no existen')+' en el inventario; no se pudo devolver su stock.');
  showNote(no);render();
 }
 function delNote(no){
  const n=db.notes.find(x=>x.no===no);if(!n)return;
- if(!confirm('¿Borrar DEFINITIVAMENTE la nota N.º '+String(no).padStart(5,'0')+'?'+(n.void?'':'\n\nNo está anulada: el stock NO se devuelve al inventario.')))return;
+ const fs=(db.creditos||[]).filter(f=>f.no===no);
+ if(!confirm('¿Borrar DEFINITIVAMENTE la nota N.º '+String(no).padStart(5,'0')+'?'+(n.void?'':'\n\nNo está anulada: el stock NO se devuelve al inventario.')+(fs.length?'\n\nTambién se borrará el crédito asociado.':'')))return;
  db.notes=db.notes.filter(x=>x.no!==no);
  if(R)R.doc('notes/'+no).delete().catch(se);else save();
+ if(fs.length){db.creditos=(db.creditos||[]).filter(f=>f.no!==no);fs.forEach(f=>R?R.doc('creditos/'+f.id).delete().catch(se):0);if(!R)save()}
  closeM();renderNotes();
 }
 function purgeVoidNotes(){
@@ -2065,6 +2372,8 @@ function renderRep(){
  const gHtml=gce.length?gce.map(([c,v])=>`<div class="list-row"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">${esc(c)}</div><div class="progress"><i style="width:${Math.max(4,Math.round(v/maxG*100))}%"></i></div></div><div><div class="list-amount">${money(v)}</div><div class="list-meta" style="text-align:right">${Math.round(v/(gTot||1)*100)}%</div></div></div>`).join(''):`<div class="empty-mini">${ico('wallet')}<span>${gSin}</span></div>`;
  const gRecent=gLs.slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
  const gRecentHtml=gRecent.length?gRecent.map(g=>`<div class="list-row" style="cursor:pointer" onclick="showGasto('${g.id}')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">${esc(g.desc)}</div><div class="list-meta">${esc(g.cat||'Otros')} · ${fFec(g.fecha)}${g.pagado?'':' · por pagar'}</div></div><div class="list-amount">${money(gUsd(g))}</div></div>`).join(''):`<div class="empty-mini">${ico('receipt')}<span>Aún no hay gastos registrados</span></div>`;
+ const fL=fPendList().sort((a,b)=>fSaldo(b)-fSaldo(a)),fTot=fCobrar();
+ const fHtml=fL.length?fL.slice(0,6).map(f=>`<div class="list-row" style="cursor:pointer" onclick="showCredito('${f.id}')"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">${esc(f.cliente)}</div><div class="list-meta">${f.no?'Nota '+String(f.no).padStart(5,'0')+' · ':''}${f.vence?'vence '+fFec(f.vence):'sin vencimiento'}</div></div><div class="list-amount">${money(fSaldo(f))}</div></div>`).join(''):`<div class="empty-mini">${ico('users')}<span>Todo cobrado</span></div>`;
  const kpis=`<div class="kpi-grid">
   <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido</div><div class="kpi-value">${money(tot)}</div><div class="kpi-foot"><span>${per}</span></div></div>
   ${adm?`<div class="kpi"><div class="kpi-icon">${ico('chart')}</div><div class="kpi-label">Ganancia bruta</div><div class="kpi-value">${money(gan)}</div><div class="kpi-foot"><span class="badge ${margen<0?'danger':margen<10?'warn':'ok'}">Margen ${margen}%</span></div></div>
@@ -2086,6 +2395,7 @@ function renderRep(){
   <section class="panel span-6">${phead('Por reponer',low.length+' repuesto'+(low.length===1?'':'s')+' con 1 unidad o menos')}<div class="list">${lowHtml}</div></section>
   <section class="panel span-6">${phead('Gastos por categoría',gLs.length?money(gTot)+' '+gPer:gSin,'<button class="link-btn" onclick="goView(\'gastos\')">Ver gastos</button>')}<div class="list">${gHtml}</div></section>
   <section class="panel span-6">${phead('Últimos gastos',gLs.length?'Los más recientes del período':'Sin registros')}<div class="list">${gRecentHtml}</div></section>
+  <section class="panel span-12">${phead('Cuentas por cobrar',fTot?money(fTot)+' pendientes · '+fPendList().length+' créditos':'Sin créditos pendientes','<button class="link-btn" onclick="goView(\'creditos\')">Ver créditos</button>')}<div class="list">${fHtml}</div></section>
  </div>`;
 }
 async function pdfNote(no,share){
@@ -2242,6 +2552,8 @@ function sync(){
  watchNotes();
  R.collection('compras').onSnapshot(s=>{db.compras=s.docs.map(d=>({...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));upd()},()=>{});
  R.collection('gastos').onSnapshot(s=>{db.gastos=s.docs.map(d=>({...d.data()})).sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))||((b.ts||0)-(a.ts||0)));upd()},()=>{});
+ R.collection('creditos').onSnapshot(s=>{db.creditos=s.docs.map(d=>({...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));upd()},()=>{});
+ R.collection('cierres').onSnapshot(s=>{db.cierres=s.docs.map(d=>({...d.data()})).sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||'')));upd()},()=>{});
  R.doc('config/prices').onSnapshot(s=>{if(s.exists){SET={...SET,...s.data()};parUI();upd()}},()=>{});
  R.doc('config/logo').onSnapshot(s=>{LOGO=s.exists?{...s.data()}:null;upd()},()=>{});
 }
