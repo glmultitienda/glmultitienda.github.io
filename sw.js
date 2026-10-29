@@ -1,4 +1,4 @@
-const CACHE = 'gl-multitienda-v7';
+const CACHE = 'gl-multitienda-v8';
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './assets/dashboard-hero.png', './assets/app-resumen.png', './assets/app-inventario.png', './assets/app-vender.png', './assets/app-notas.png', './assets/app-movil.png'];
 
 self.addEventListener('install', e => {

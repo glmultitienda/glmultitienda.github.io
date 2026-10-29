@@ -26,7 +26,7 @@ window.FB={
  logout:()=>signOut(auth),
  R:{
   doc:p=>({set:(d,o)=>setDoc(doc(fs,p),d,o||{}),delete:()=>deleteDoc(doc(fs,p)),get:async()=>ds(await getDoc(doc(fs,p))),onSnapshot:(ok,er)=>onSnapshot(doc(fs,p),x=>ok(ds(x)),er)}),
-  collection:(n,w)=>({onSnapshot:(ok,er)=>onSnapshot(w?query(collection(fs,n),where(w[0],w[1],w[2])):collection(fs,n),x=>ok({docs:x.docs.map(d=>({data:()=>d.data()})),empty:x.empty}),er)})
+  collection:(n,w)=>({onSnapshot:(ok,er)=>onSnapshot(w?query(collection(fs,n),where(w[0],w[1],w[2])):collection(fs,n),x=>ok({docs:x.docs.map(d=>({id:d.id,data:()=>d.data()})),empty:x.empty}),er)})
  }
 };
 window.dispatchEvent(new Event('fbready'));
@@ -1137,7 +1137,7 @@ function commit(ps=[],ns=[]){if(!R)return save();const c=o=>JSON.parse(JSON.stri
 function patchParts(list){
  if(!R)return save();
  const c=o=>JSON.parse(JSON.stringify(o));
- list.forEach(([id,patch])=>R.doc('parts/'+id).set(c(patch),{merge:true}).catch(se));
+ list.forEach(([id,patch])=>{if(!id)return;R.doc('parts/'+id).set(c(patch),{merge:true}).catch(se)});
  return true;
 }
 const MEDIA_KEY='glm_media';
@@ -1504,7 +1504,7 @@ function savePart(id){
  const patch={name,code:$('#f_code').value.trim(),brand:$('#f_brand').value.trim(),cost:$('#f_cost')?+$('#f_cost').value||0:(id?find(id).cost||0:0),pcash:+$('#f_pcash').value||0,pbcv:+$('#f_pbcv').value||0,price:+$('#f_pbcv').value||0,base:Math.round((+$('#f_pbcv').value||0)/(1+difPct()/100)*10000)/10000,cman:$('#f_pcash').dataset.cm==='1',pml:+$('#f_pml').value||0,mman:$('#f_pml').dataset.mm==='1',stock:Math.max(0,parseInt($('#f_stock').value)||0),min:1};
  if(!id||window._imgDirty)patch.img=window._img||'';
  let p;if(id){p=find(id);if(!p)return;Object.assign(p,patch)}else{p={id:uid(),ts:Date.now(),...patch};db.parts.unshift(p)}
- if(patchParts([[p.id,patch]])!==false){if(window._imgDirty)saveMedia({id:p.id,img:window._img||'',name:p.name,code:p.code});closeM();render()}
+ if(patchParts([[p.id,id?patch:{...patch,id:p.id,ts:p.ts}]])!==false){if(window._imgDirty)saveMedia({id:p.id,img:window._img||'',name:p.name,code:p.code});closeM();render()}
 }
 function delPart(id){if(confirm('¿Eliminar este repuesto?')){db.parts=db.parts.filter(p=>p.id!==id);if(R)R.doc('parts/'+id).delete().catch(se);else save();closeM();render()}}
 function addStock(id){const p=find(id);if(!p)return;
@@ -1519,7 +1519,7 @@ async function exportDb(){
  try{await dl.save({filename:'gl-multitienda-respaldo-'+new Date().toISOString().slice(0,10)+'.json',data:JSON.stringify({...db,logo:LOGO})})}
  catch(e){if(!e||e.code!=='declined')alert('No se pudo guardar el respaldo: '+((e&&e.message)||'error'))}
 }
-function importDb(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.parts)throw 0;if(confirm('Esto reemplazará los datos actuales. ¿Continuar?')){db=d;db.notes=d.notes||[];db.creditos=d.creditos||[];db.cierres=d.cierres||[];commit(d.parts.map(p=>({ts:0,...p})),db.notes);if(R){db.creditos.forEach(x=>R.doc('creditos/'+x.id).set(JSON.parse(JSON.stringify(x))).catch(se));db.cierres.forEach(c=>R.doc('cierres/'+c.fecha).set(JSON.parse(JSON.stringify(c))).catch(se))}else save();render()}}catch(e){alert('Archivo no válido')}};r.readAsText(f)}
+function importDb(inp){const f=inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.parts)throw 0;if(confirm('Esto reemplazará los datos actuales. ¿Continuar?')){db=d;db.notes=d.notes||[];db.creditos=d.creditos||[];db.cierres=d.cierres||[];commit(d.parts.map(p=>({ts:0,...p,id:p.id||uid()})),db.notes);if(R){db.creditos.forEach(x=>R.doc('creditos/'+x.id).set(JSON.parse(JSON.stringify(x))).catch(se));db.cierres.forEach(c=>R.doc('cierres/'+c.fecha).set(JSON.parse(JSON.stringify(c))).catch(se))}else save();render()}}catch(e){alert('Archivo no válido')}};r.readAsText(f)}
 
 /* ---------- VENDER ---------- */
 function renderSell(){
@@ -2537,7 +2537,11 @@ lockUI();window.FB?boot():window.addEventListener('fbready',boot);
 function sync(){
  const upd=()=>{cart=cart.filter(c=>find(c.id));const m=$('#modal').classList.contains('on'),a=document.activeElement;if(!m&&!(a&&a.tagName==='INPUT'))render();else refreshList()};
  R.collection('parts').onSnapshot(s=>{
-  db.parts=s.docs.map(d=>({ts:0,...d.data()})).sort((a,b)=>b.ts-a.ts);
+  const fixIds=[];
+  db.parts=s.docs.map(d=>{const o=d.data();if(!o.name)return null;const id=o.id||d.id,ts=+o.ts||Date.now();
+   if(!o.id||!o.ts)fixIds.push([d.id,{id,ts}]);
+   return{...o,id,ts}}).filter(Boolean).sort((a,b)=>b.ts-a.ts);
+  fixIds.forEach(([id,p])=>R.doc('parts/'+id).set(p,{merge:true}).catch(se));
   $('#st').textContent='☁ Sincronizado';
   if(!mig){mig=true;if(s.empty&&LOC.parts.length&&confirm('Se encontraron '+LOC.parts.length+' repuestos guardados en este dispositivo. ¿Subirlos a la nube para sincronizarlos?'))commit(LOC.parts.map((p,i)=>({ts:Date.now()-i,...p})),LOC.notes)}
   if(!mediaWarned){const md=mediaDiff();if(md.length){mediaWarned=true;toast('Hay fotos o marcas de ML de este equipo que faltan en la nube: Inventario → Respaldo de datos → Restaurar.')}}
