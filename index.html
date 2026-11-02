@@ -1118,7 +1118,7 @@ footer{padding:46px 0 30px;border-top:1px solid var(--bd);margin-top:74px;backgr
 
 <script>
 let LOGO=null,CL=[],db={parts:[],notes:[],compras:[],gastos:[],creditos:[],cierres:[]},R=null,mig=false,view='dash',q='',cart=[],client={name:'',phone:'',ci:''},mlFil='all';
-let USER=null,synced=false,mediaWarned=false,payMethod='Efectivo',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,gP='mes',gFil='all',fFil='pend',ventaVence='',SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum',autoRecalc:true};
+let USER=null,synced=false,mediaWarned=false,payMethod='Pago móvil',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,gP='mes',gFil='all',fFil='pend',ventaVence='',SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum',autoRecalc:true};
 const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro','Crédito'];
 const ADMINS=[]; // correos con acceso a costos y ganancias (vacío = todos)
 const isAdmin=()=>!ADMINS.length||(USER&&ADMINS.includes((USER.email||'').toLowerCase()));
@@ -1572,7 +1572,7 @@ function checkout(){
   const f={id:uid(),ts:Date.now(),fecha:dISO(0),no:n.no,cliente:n.client,ci:n.ci,phone:n.phone,total:n.total,vence:ventaVence||'',nota:'',abonos:[]};
   db.creditos=(db.creditos||[]).concat(f);syncCredito(f);
  }
- ventaVence='';
+ ventaVence='';payMethod='Pago móvil';
  cart=[];client={name:'',phone:'',ci:''};bsMan=null;renderSell();showNote(n.no);
 }
 
@@ -2167,7 +2167,7 @@ function renderCaja(){
  abL.sort((a,b)=>(b.ts||0)-(a.ts||0));
  const abHtml=abL.length?abL.map(x=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">${esc(x.cliente)}</div><div class="list-meta">${esc(x.met||'Efectivo')}${x.mon==='Bs'?` · Bs ${bsf(x.monto)}`:''}</div></div><div class="list-amount">${money(x.usd)}</div></div>`).join(''):`<div class="empty-mini">${ico('users')}<span>Sin abonos de créditos</span></div>`;
  const gHtml=d.gLs.length?d.gLs.map(g=>`<div class="list-row" style="cursor:pointer" onclick="showGasto('${g.id}')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">${esc(g.desc)}</div><div class="list-meta">${esc(g.cat||'Otros')} · pagado ${fFec(g.pago)} · ${esc(g.met||'Efectivo')}</div></div><div class="list-amount">${money(gUsd(g))}</div></div>`).join(''):`<div class="empty-mini">${ico('wallet')}<span>Sin gastos pagados este día</span></div>`;
- const arqRows=CJ_MET.map((k,i)=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Esperado ${money(d.esp[k]||0)}</div></div><div style="width:124px;flex:none"><input id="cj_${i}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${saved&&saved.contado&&saved.contado[k]!=null?saved.contado[k]:''}" oninput="cajaCalc()" aria-label="Contado en ${k}" style="margin:0"></div><div class="list-amount" id="cjd_${i}" style="min-width:82px;text-align:right">—</div></div>`).join('');
+ const arqRows=CJ_MET.map((k,i)=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Esperado ${money(d.esp[k]||0)}</div></div><div style="width:124px;flex:none"><input id="cj_${i}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${saved&&saved.contado&&saved.contado[k]!=null?saved.contado[k]:(+d.esp[k]||0).toFixed(2)}" oninput="cajaCalc()" aria-label="Contado en ${k}" style="margin:0"></div><div class="list-amount" id="cjd_${i}" style="min-width:82px;text-align:right">—</div></div>`).join('');
  const hist=(db.cierres||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
  const histHtml=hist.length?hist.map(c=>`<div class="list-row" style="cursor:pointer" onclick="setCajaDay('${c.fecha}')"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${fFec(c.fecha)}</div><div class="list-meta">Vendido ${money(c.ventasTot)} · Contado ${money(c.contadoTot||0)}</div></div><span class="badge ${c.difTotal===0?'ok':Math.abs(c.difTotal)<=1?'warn':'danger'}">${c.difTotal===0?'Cuadrado':(c.difTotal>0?'+':'−')+money(Math.abs(c.difTotal||0))}</span></div>`).join(''):`<div class="empty-mini">${ico('clock')}<span>Aún no hay cierres guardados</span></div>`;
  $('#app').innerHTML=`<div class="page-toolbar"><div class="toolbar-actions" style="margin-left:0"><input type="date" value="${cajaDay}" onchange="setCajaDay(this.value)" style="width:auto;margin:0" aria-label="Día del cierre"><button class="btn g s" onclick="cajaHoy()">${ico('clock')} Hoy</button></div><div class="toolbar-actions"><button class="btn g s" onclick="waCierre()">${ico('users')} Enviar cierre</button></div></div>
@@ -2175,7 +2175,7 @@ function renderCaja(){
  <div class="dash-grid">
   <section class="panel span-6">${phead('Movimientos del día','Ventas, abonos y gastos')}<div class="list">${metHtml}</div></section>
   <section class="panel span-6">${phead('Abonos cobrados',abL.length?money(d.abonosTot):'Sin abonos este día')}<div class="list">${abHtml}</div></section>
-  <section class="panel span-8">${phead('Arqueo de caja','Escribe lo contado por método. La diferencia se calcula sola.')}<div class="list">${arqRows}</div><div class="panel-sub" id="cj_tot" style="margin-top:10px">—</div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="saveCierre()">${ico('check')} ${saved?'Guardar de nuevo':'Guardar cierre'}</button></div></section>
+  <section class="panel span-8">${phead('Arqueo de caja','Los montos se llenan solos con lo esperado. Si tu conteo es distinto, corrígelo y guarda el cierre.')}<div class="list">${arqRows}</div><div class="panel-sub" id="cj_tot" style="margin-top:10px">—</div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="saveCierre()">${ico('check')} ${saved?'Guardar de nuevo':'Guardar cierre'}</button></div></section>
   <section class="panel span-4">${phead('Gastos pagados',d.gastos?money(d.gastos)+' del día':'Sin gastos')}<div class="list">${gHtml}</div></section>
   <section class="panel span-12">${phead('Últimos cierres','Los 6 más recientes')}<div class="list">${histHtml}</div></section>
  </div>`;
