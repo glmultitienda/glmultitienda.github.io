@@ -1118,7 +1118,7 @@ footer{padding:46px 0 30px;border-top:1px solid var(--bd);margin-top:74px;backgr
 
 <script>
 let LOGO=null,CL=[],db={parts:[],notes:[],compras:[],gastos:[],creditos:[],cierres:[]},R=null,mig=false,view='dash',q='',cart=[],client={name:'',phone:'',ci:''},mlFil='all';
-let USER=null,synced=false,mediaWarned=false,payMethod='Pago móvil',repP='hoy',payTier='bcv',invF='all',notesAll=false,SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,gP='mes',gFil='all',fFil='pend',ventaVence='',SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum',autoRecalc:true};
+let USER=null,synced=false,mediaWarned=false,payMethod='Pago móvil',repP='hoy',payTier='bcv',invF='all',notesAll=false,notesFil='notas',SEQ=0,RATE=0,RATE_MAN=false,RATE_INFO=null,bsMan=null,gP='mes',gFil='all',fFil='pend',ventaVence='',SET={par:0,difMan:'',disc:20,ml:13,oth:2,mode:'sum',autoRecalc:true};
 const PAYS=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro','Crédito'];
 const ADMINS=[]; // correos con acceso a costos y ganancias (vacío = todos)
 const isAdmin=()=>!ADMINS.length||(USER&&ADMINS.includes((USER.email||'').toLowerCase()));
@@ -1198,7 +1198,7 @@ function updateTopbar(){
  const mb=$('#moreBtn2');if(mb)mb.classList.toggle('on',['compras','cli','rep','gastos','creditos','caja'].includes(view));
 }
 function goView(v){
- view=v;q='';toggleMore(false);
+ view=v;q='';toggleMore(false);if(v==='notes')notesFil='notas';
  document.querySelectorAll('[data-v]').forEach(x=>x.classList.toggle('on',x.dataset.v===v));
  render();window.scrollTo({top:0,behavior:'smooth'});
 }
@@ -1246,6 +1246,9 @@ function renderDash(){
  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
  const tNotes=notesIn(today,tomorrow),yNotes=notesIn(yStart,today),mNotes=notesIn(monthStart,tomorrow);
  const tTot=sumTot(tNotes),yTot=sumTot(yNotes),mTot=sumTot(mNotes),mProfit=mNotes.reduce((a,n)=>a+noteProfit(n),0),mExp=sumGastos(monthStart,tomorrow),gPendN=(db.gastos||[]).filter(g=>!g.pagado).length;
+ const tCred=tNotes.reduce((a,n)=>a+(n.pay==='Crédito'?(+n.total||0):0),0);
+ let tAb=0;(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')===dISO(0))tAb+=(+x.usd||0)}));
+ const tCob=Math.round((tTot-tCred+tAb)*100)/100;
  const admin=isAdmin(),units=db.parts.reduce((a,p)=>a+(+p.stock||0),0);
  const invCost=db.parts.reduce((a,p)=>a+(+p.stock||0)*(+p.cost||0),0);
  const invRetail=db.parts.reduce((a,p)=>a+(+p.stock||0)*pr(p,'bcv'),0);
@@ -1261,7 +1264,7 @@ function renderDash(){
  }
  const trend=yTot?`<span class="trend ${tTot<yTot?'down':''}">${ico(tTot<yTot?'arrow-down':'arrow-up')}${Math.abs(Math.round((tTot-yTot)/yTot*100))}%</span><span>vs ayer</span>`:`<span class="badge info">${tTot?'Primer día con ventas':'Sin ventas hoy'}</span>`;
  const kpis=`<div class="kpi-grid">
- <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido hoy</div><div class="kpi-value">${money(tTot)}</div><div class="kpi-foot">${trend}</div>${sparkHtml(days.map(d=>d[1]))}</div>
+ <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido hoy</div><div class="kpi-value">${money(tTot)}</div><div class="kpi-foot">${trend}${(tCred||tAb)?`<span>· Cobrado ${money(tCob)}${tAb?' (incluye abonos '+money(tAb)+')':''}</span>`:''}</div>${sparkHtml(days.map(d=>d[1]))}</div>
  <div class="kpi"><div class="kpi-icon">${ico(admin?'chart':'wallet')}</div><div class="kpi-label">${admin?'Utilidad neta del mes':'Vendido este mes'}</div><div class="kpi-value">${money(admin?mProfit-mExp:mTot)}</div><div class="kpi-foot">${admin?`<span>Bruto ${money(mProfit)}</span><span>· Gastos ${money(mExp)}</span>`:`<span>${mNotes.length} nota${mNotes.length===1?'':'s'}</span>${tNotes.length?`<span>· ${money(tTot)} hoy</span>`:''}`}</div></div>
  <div class="kpi purple"><div class="kpi-icon">${ico('box')}</div><div class="kpi-label">${admin?'Inversión en inventario':'Inventario a la venta'}</div><div class="kpi-value">${money(admin?invCost:invRetail)}</div><div class="kpi-foot"><span>${db.parts.length} repuestos · ${units} uds</span></div></div>
  <div class="kpi warn"><div class="kpi-icon">${ico('alert')}</div><div class="kpi-label">Por reponer</div><div class="kpi-value">${low.length}</div><div class="kpi-foot">${zero.length?`<span class="badge danger">${zero.length} agotado${pl(zero.length,'','s')}</span>`:'<span class="badge ok">Stock saludable</span>'}</div></div>
@@ -1929,6 +1932,11 @@ function delGasto(id){
 
 /* ---------- CRÉDITOS (CUENTAS POR COBRAR) ---------- */
 function fAbonado(f){return (f.abonos||[]).reduce((a,x)=>a+(+x.usd||0),0)}
+function abonosAll(){
+ const L=[];
+ (db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>L.push({...x,cliente:f.cliente,credito:f})));
+ return L.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))||((b.ts||0)-(a.ts||0)));
+}
 function fSaldo(f){return Math.max(0,Math.round(((+f.total||0)-fAbonado(f))*100)/100)}
 function fPagado(f){return fSaldo(f)<=0.009}
 function fVencido(f){return !fPagado(f)&&!!f.vence&&diasVence(f.vence)<0}
@@ -1990,7 +1998,7 @@ function addAbono(id){
  <div class="mu" style="margin-top:4px">${esc(f.cliente)} · saldo ${money(fSaldo(f))}</div>
  <label style="display:block;margin-top:14px">Monto</label>
  <div style="display:flex;gap:10px"><div style="flex:1"><input id="ab_monto" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00"></div><div style="width:92px"><select id="ab_mon"><option value="$">$</option><option value="Bs">Bs</option></select></div></div>
- <label style="display:block;margin-top:10px">Método</label><select id="ab_met">${CJ_MET.map(k=>`<option>${k}</option>`).join('')}</select>
+ <label style="display:block;margin-top:10px">Método</label><select id="ab_met">${CJ_MET.map(k=>`<option ${k==='Pago móvil'?'selected':''}>${k}</option>`).join('')}</select>
  <label style="display:block;margin-top:10px">Fecha</label><input id="ab_fecha" type="date" value="${dISO(0)}">
  <label style="display:block;margin-top:10px">Nota (opcional)</label><input id="ab_nota" placeholder="Ej: abono semanal" autocomplete="off">
  <div class="row" style="margin-top:16px"><button class="btn ok" onclick="saveAbono()">${ico('check')} Guardar abono</button><button class="btn g" onclick="showCredito('${f.id}')">Volver</button></div>`;
@@ -2184,9 +2192,13 @@ function renderCaja(){
  if(d.creditoTot)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Crédito</div><div class="list-meta">No entra a caja · queda por cobrar</div></div><div class="list-amount">${money(d.creditoTot)}</div></div>`);
  if(d.gastos)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">Gastos pagados</div><div class="list-meta">Descontados de la caja esperada</div></div><div class="list-amount" style="color:var(--danger)">−${money(d.gastos)}</div></div>`);
  const metHtml=metRows.length?metRows.join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin movimientos este día</span></div>`;
- const abL=[];(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')===cajaDay)abL.push({...x,cliente:f.cliente})}));
+ const abL=[];(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')===cajaDay)abL.push({...x,cliente:f.cliente,no:f.no,credito:f.id})}));
  abL.sort((a,b)=>(b.ts||0)-(a.ts||0));
- const abHtml=abL.length?abL.map(x=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">${esc(x.cliente)}</div><div class="list-meta">${esc(x.met||'Efectivo')}${x.mon==='Bs'?` · Bs ${bsf(x.monto)}`:''}</div></div><div class="list-amount">${money(x.usd)}</div></div>`).join(''):`<div class="empty-mini">${ico('users')}<span>Sin abonos de créditos</span></div>`;
+ const abHtml=abL.length?abL.map(x=>`<div class="list-row" style="cursor:pointer" onclick="showCredito('${x.credito}')"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">${esc(x.cliente)}</div><div class="list-meta">${esc(x.met||'Efectivo')}${x.mon==='Bs'?` · Bs ${bsf(x.monto)}`:''}${x.no?` · Nota N.º ${String(x.no).padStart(5,'0')}`:''}</div></div><div class="list-amount">${money(x.usd)}</div></div>`).join(''):`<div class="empty-mini">${ico('users')}<span>Sin abonos de créditos</span></div>`;
+ const crNo=new Map((db.creditos||[]).filter(f=>f.no).map(f=>[f.no,f]));
+ const venL=d.ns.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
+ const venHtml=venL.length?venL.map(n=>{const cr=crNo.get(n.no),its=(n.items||[]).map(i=>esc(i.name)+(i.qty>1?' ×'+i.qty:'')).join(' · '),hora=new Date(n.date).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
+  return `<div class="list-row" style="cursor:pointer" onclick="showNote(${n.no})"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="list-meta" style="white-space:normal;line-height:1.45">${hora} · ${esc(n.pay||'Sin pago')} · ${(n.items||[]).length} ${pl((n.items||[]).length,'artículo','artículos')}${its?' · '+its:''}</div>${cr?`<div class="list-meta" style="margin-top:4px"><span class="badge ${fPagado(cr)?'ok':'warn'}">${fPagado(cr)?'Crédito pagado':'Crédito · saldo '+money(fSaldo(cr))}</span></div>`:''}</div><div class="list-amount">${money(n.total)}</div></div>`}).join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin ventas este día</span></div>`;
  const gHtml=d.gLs.length?d.gLs.map(g=>`<div class="list-row" style="cursor:pointer" onclick="showGasto('${g.id}')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">${esc(g.desc)}</div><div class="list-meta">${esc(g.cat||'Otros')} · pagado ${fFec(g.pago)} · ${esc(g.met||'Efectivo')}</div></div><div class="list-amount">${money(gUsd(g))}</div></div>`).join(''):`<div class="empty-mini">${ico('wallet')}<span>Sin gastos pagados este día</span></div>`;
  const arqRows=CJ_MET.map((k,i)=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Esperado ${money(d.esp[k]||0)}</div></div><div style="width:124px;flex:none"><input id="cj_${i}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${saved&&saved.contado&&saved.contado[k]!=null?saved.contado[k]:(+d.esp[k]||0).toFixed(2)}" oninput="cajaCalc()" aria-label="Contado en ${k}" style="margin:0"></div><div class="list-amount" id="cjd_${i}" style="min-width:82px;text-align:right">—</div></div>`).join('');
  const hist=(db.cierres||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
@@ -2195,8 +2207,9 @@ function renderCaja(){
  ${pendHtml}
  ${kpis}
  <div class="dash-grid">
+  <section class="panel span-12">${phead('Ventas del día',venL.length?venL.length+' '+pl(venL.length,'nota','notas')+' · '+money(d.ventasTot)+(d.creditoTot?' (incluye '+money(d.creditoTot)+' a crédito)':''):'Sin ventas este día')}<div class="list">${venHtml}</div></section>
   <section class="panel span-6">${phead('Movimientos del día','Ventas, abonos y gastos')}<div class="list">${metHtml}</div></section>
-  <section class="panel span-6">${phead('Abonos cobrados',abL.length?money(d.abonosTot):'Sin abonos este día')}<div class="list">${abHtml}</div></section>
+  <section class="panel span-6">${phead('Abonos cobrados',abL.length?money(d.abonosTot):'Sin abonos este día',abL.length?`<button class="link-btn" onclick="goView('notes');setNotesFil('abonos')">Ver en Notas</button>`:'')}<div class="list">${abHtml}</div></section>
   <section class="panel span-8">${phead('Arqueo de caja','Los montos se llenan solos con lo esperado. Si tu conteo es distinto, corrígelo y guarda el cierre.')}<div class="list">${arqRows}</div><div class="panel-sub" id="cj_tot" style="margin-top:10px">—</div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="saveCierre()">${ico('check')} ${saved?'Guardar de nuevo':'Guardar cierre'}</button></div></section>
   <section class="panel span-4">${phead('Gastos pagados',d.gastos?money(d.gastos)+' del día':'Sin gastos')}<div class="list">${gHtml}</div></section>
   <section class="panel span-12">${phead('Últimos cierres','Los 6 más recientes')}<div class="list">${histHtml}</div></section>
@@ -2230,25 +2243,42 @@ function zoom(id){const p=find(id);if(!p||!p.img)return;
  $('#modal').classList.add('on')}
 $('#modal').addEventListener('click',e=>{if(e.target.id==='modal')closeM()});
 function moreNotes(){return notesAll?'':`<div class="notice-bar">${ico('clock')}<span>Mostrando las notas de los últimos 60 días.</span><button class="btn s g" onclick="loadAllNotes()">Ver notas anteriores</button></div>`}
+function setNotesFil(v){notesFil=v;renderNotes()}
 function renderNotes(){
- const anul=db.notes.filter(n=>n.void).length;
- if(!db.notes.length){$('#app').innerHTML=moreNotes()+`<div class="empty-state"><div class="empty-ico">${ico('receipt')}</div><h3>Aún no hay notas de entrega</h3><p>Cuando vendas un repuesto se genera la nota automáticamente, con cliente, precios y total en Bs.</p><button class="btn" onclick="goView('sell')">${ico('cart')} Crear una venta</button></div>`;return}
- $('#app').innerHTML=moreNotes()+`<div class="page-toolbar"><span class="badge info">${db.notes.length} nota${db.notes.length===1?'':'s'}</span>${anul?`<span class="badge danger">${anul} anulada${anul===1?'':'s'}</span>`:''}<div class="toolbar-actions">${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgeVoidNotes()">${ico('trash')} Borrar anuladas</button>`:''}</div></div>
- <div class="list-card">${db.notes.map(n=>`<div class="doc-row" onclick="showNote(${n.no})"><div class="doc-ico ${n.void?'warn':'ok'}">${ico('receipt')}</div>
- <div class="doc-main"><div class="doc-title" ${n.void?'style="text-decoration:line-through"':''}>Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="doc-meta"><span>${new Date(n.date).toLocaleString('es')}</span><span>·</span><span>${esc(n.pay||'Sin pago')}</span>${n.ci?`<span>·</span><span>${esc(n.ci)}</span>`:''}${n.void?'<span class="badge danger">Anulada</span>':''}</div></div>
- <div class="doc-amount" ${n.void?'style="text-decoration:line-through;color:var(--danger)"':''}>${money(n.total)}</div></div>`).join('')}</div>`;
+ const anul=db.notes.filter(n=>n.void).length,abL=abonosAll(),abTot=Math.round(abL.reduce((t,x)=>t+(+x.usd||0),0)*100)/100;
+ const seg=`<div class="seg"><button class="${notesFil==='notas'?'on':''}" onclick="setNotesFil('notas')">Notas</button><button class="${notesFil==='abonos'?'on':''}" onclick="setNotesFil('abonos')">Abonos${abL.length?' · '+abL.length:''}</button></div>`;
+ if(notesFil==='abonos'){
+  const html=abL.length?`<div class="list-card">${abL.map(x=>{const f=x.credito,pag=fPagado(f);
+   return `<div class="doc-row" onclick="showCredito('${f.id}')"><div class="doc-ico ${pag?'ok':'warn'}">${ico('dollar')}</div>
+   <div class="doc-main"><div class="doc-title">${esc(x.cliente)} · ${money(x.usd)}</div>
+   <div class="doc-meta"><span>${fFec(x.fecha)}</span><span>·</span><span>${esc(x.met||'Efectivo')}</span>${x.mon==='Bs'?`<span>·</span><span>Bs ${bsf(x.monto)}</span>`:''}${f.no?`<span>·</span><span>Nota N.º ${String(f.no).padStart(5,'0')}</span>`:''}</div>
+   <div class="doc-meta" style="margin-top:5px"><span class="badge ${pag?'ok':'warn'}">${pag?'Crédito pagado':'Crédito pendiente'}</span><span>Abonado ${money(fAbonado(f))} de ${money(f.total)}</span><span>·</span><span>Saldo ${money(fSaldo(f))}</span></div></div>
+   <div class="doc-amount">${money(x.usd)}</div></div>`}).join('')}</div>`:`<div class="empty-state"><div class="empty-ico">${ico('dollar')}</div><h3>Aún no hay abonos</h3><p>Cuando un cliente pague su crédito, el abono aparecerá aquí y sumará al Cobrado del cierre de caja.</p><button class="btn" onclick="goView('creditos')">${ico('users')} Ver créditos</button></div>`;
+  $('#app').innerHTML=`<div class="page-toolbar">${seg}<span class="badge ok">${abL.length} ${pl(abL.length,'abono','abonos')} · ${money(abTot)} cobrado</span></div>
+  <div class="notice-bar">${ico('dollar')}<span><b>Los abonos no generan una nota nueva</b>: la venta ya se registró a crédito. Aquí ves cada pago y en el Cierre de caja suman al <b>Cobrado</b> del día.</span></div>${html}`;
+  return;
+ }
+ if(!db.notes.length){$('#app').innerHTML=moreNotes()+`<div class="page-toolbar">${seg}</div><div class="empty-state"><div class="empty-ico">${ico('receipt')}</div><h3>Aún no hay notas de entrega</h3><p>Cuando vendas un repuesto se genera la nota automáticamente, con cliente, precios y total en Bs.</p><button class="btn" onclick="goView('sell')">${ico('cart')} Crear una venta</button></div>`;return}
+ const crNo=new Map((db.creditos||[]).filter(f=>f.no).map(f=>[f.no,f]));
+ $('#app').innerHTML=moreNotes()+`<div class="page-toolbar">${seg}<span class="badge info">${db.notes.length} nota${db.notes.length===1?'':'s'}</span>${anul?`<span class="badge danger">${anul} anulada${anul===1?'':'s'}</span>`:''}<div class="toolbar-actions">${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgeVoidNotes()">${ico('trash')} Borrar anuladas</button>`:''}</div></div>
+ <div class="list-card">${db.notes.map(n=>{const cr=crNo.get(n.no);
+  return `<div class="doc-row" onclick="showNote(${n.no})"><div class="doc-ico ${n.void?'warn':'ok'}">${ico('receipt')}</div>
+ <div class="doc-main"><div class="doc-title" ${n.void?'style="text-decoration:line-through"':''}>Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="doc-meta"><span>${new Date(n.date).toLocaleString('es')}</span><span>·</span><span>${esc(n.pay||'Sin pago')}</span>${n.ci?`<span>·</span><span>${esc(n.ci)}</span>`:''}${n.void?'<span class="badge danger">Anulada</span>':''}</div>
+ ${cr?`<div class="doc-meta" style="margin-top:5px"><span class="badge ${fPagado(cr)?'ok':'warn'}">${fPagado(cr)?'Crédito pagado':'Crédito pendiente'}</span><span>Abonado ${money(fAbonado(cr))} de ${money(cr.total)}</span><span>·</span><span>Saldo ${money(fSaldo(cr))}</span></div>`:''}</div>
+ <div class="doc-amount" ${n.void?'style="text-decoration:line-through;color:var(--danger)"':''}>${money(n.total)}</div></div>`}).join('')}</div>`;
 }
 function showNote(no){
  const n=db.notes.find(x=>x.no===no);
  const fdo=(db.creditos||[]).find(x=>x.no===no);
  $('#box').innerHTML=`<div class="note"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div><h2>GL Multitienda</h2><div style="font-size:13px">Repuestos automotrices</div></div>${LOGO?`<img src="${LOGO.img}" style="max-height:70px;max-width:40%">`:''}</div>
  <h3 style="margin:12px 0 4px">NOTA DE ENTREGA N.º ${String(n.no).padStart(5,'0')}</h3>${n.void?'<div style="color:#b91c1c;font-weight:700">NOTA ANULADA</div>':''}
- <div style="font-size:14px">Fecha: ${new Date(n.date).toLocaleString('es')}<br>Cliente: <b>${esc(n.client)}</b>${n.ci?'<br>Cédula: '+esc(n.ci):''}${n.phone?'<br>Tel: '+esc(n.phone):''}${n.pay?'<br>Pago: '+esc(n.pay)+(n.tier?' · Precio '+(n.tier==='bcv'?'$ BCV':'$ CASH'):''):''}${fdo?'<br>Crédito: saldo '+money(fSaldo(fdo))+(fdo.vence?' · vence '+fFec(fdo.vence):''):''}</div>
+ <div style="font-size:14px">Fecha: ${new Date(n.date).toLocaleString('es')}<br>Cliente: <b>${esc(n.client)}</b>${n.ci?'<br>Cédula: '+esc(n.ci):''}${n.phone?'<br>Tel: '+esc(n.phone):''}${n.pay?'<br>Pago: '+esc(n.pay)+(n.tier?' · Precio '+(n.tier==='bcv'?'$ BCV':'$ CASH'):''):''}${fdo?'<br>Crédito: abonado '+money(fAbonado(fdo))+' de '+money(fdo.total)+' · saldo '+money(fSaldo(fdo))+(fdo.vence?' · vence '+fFec(fdo.vence):''):''}</div>
  <div style="overflow-x:auto"><table><tr><th>Cant.</th><th>Descripción</th><th class="r">P. unit.</th><th class="r">Importe</th></tr>
  ${n.items.map(i=>`<tr><td>${i.qty}</td><td>${esc(i.name)}<br><small>${esc(i.code)}</small></td><td class="r">${money(i.price)}</td><td class="r">${money(i.qty*i.price)}</td></tr>`).join('')}
  <tr><td colspan="3" class="r"><b>TOTAL</b></td><td class="r"><b>${money(n.total)}</b></td></tr>${n.bs>0?`<tr><td colspan="3" class="r"><b>TOTAL Bs</b></td><td class="r"><b>Bs ${bsf(n.bs)}</b></td></tr>`:''}</table></div>
  <div class="sig"><div>Entregado por</div><div>Recibido por</div></div></div>
- <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">${ico('download')} Descargar PDF</button><button class="btn ok" onclick="pdfNote(${n.no},true)">${ico('users')} WhatsApp</button><button class="btn g" onclick="window.print()">${ico('print')} Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" onclick="voidNote(${n.no})">${ico('alert')} Anular nota</button>`}<button class="btn danger" onclick="delNote(${n.no})">${ico('trash')} Borrar</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
+ ${fdo&&(fdo.abonos||[]).length?`<div class="panel noprint" style="margin-top:12px">${phead('Abonos de este crédito',money(fAbonado(fdo))+' abonado · saldo '+money(fSaldo(fdo)))}<div class="list">${fdo.abonos.slice().sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))||((b.ts||0)-(a.ts||0))).map(x=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${money(x.usd)}${x.mon==='Bs'?` <span class="mu">· Bs ${bsf(x.monto)}</span>`:''}</div><div class="list-meta">${fFec(x.fecha)} · ${esc(x.met||'Efectivo')}${x.nota?' · '+esc(x.nota):''}</div></div></div>`).join('')}</div></div>`:''}
+ <div class="row noprint" style="margin-top:12px"><button class="btn" onclick="pdfNote(${n.no})">${ico('download')} Descargar PDF</button><button class="btn ok" onclick="pdfNote(${n.no},true)">${ico('users')} WhatsApp</button><button class="btn g" onclick="window.print()">${ico('print')} Imprimir</button>${n.void?'':`<button class="btn g" onclick="editBs(${n.no})">Cambiar Bs</button><button class="btn g" onclick="voidNote(${n.no})">${ico('alert')} Anular nota</button>`}${fdo?`<button class="btn g" onclick="showCredito('${fdo.id}')">${ico('users')} Ver crédito</button>`:''}<button class="btn danger" onclick="delNote(${n.no})">${ico('trash')} Borrar</button><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
  $('#modal').classList.add('on');
 }
 function clients(){
