@@ -2198,6 +2198,25 @@ function cajaData(day){
  const ventasTot=Math.round((ventasCont+abonosTot)*100)/100;
  return{ns,ventas,ventasCont:Math.round(ventasCont*100)/100,ventasTot,creditoTot:Math.round(creditoTot*100)/100,abonos,abonosTot:Math.round(abonosTot*100)/100,gastos,gLs,esp,esperado};
 }
+function repuestosDia(day){
+ const[a,b]=diaRange(day),M=new Map();
+ db.notes.filter(n=>!n.void&&new Date(n.date)>=a&&new Date(n.date)<b).forEach(n=>(n.items||[]).forEach(i=>{
+  if(!i.name||i.name==='Ajuste')return;
+  const k=i.id||((i.code||'')+'|'+(i.name||''));
+  const t=M.get(k)||{name:i.name,code:i.code||'',qty:0,total:0,notas:new Set()};
+  t.qty+=(+i.qty||0);t.total+=(+i.qty||0)*(+i.price||0);t.notas.add(n.no);M.set(k,t);
+ }));
+ return [...M.values()].map(x=>({...x,total:Math.round(x.total*100)/100,notas:[...x.notas].sort((p,q)=>p-q)})).sort((x,y)=>y.qty-x.qty||String(x.name).localeCompare(String(y.name)));
+}
+function soldDiaText(day){
+ const L=repuestosDia(day);
+ return '*GL Multitienda · Repuestos vendidos*\n'+fFec(day)+'\n\n'+L.map(x=>'• '+x.qty+' × '+x.name+(x.code?' ('+x.code+')':'')).join('\n');
+}
+async function copySoldDia(){
+ const L=repuestosDia(cajaDay);
+ if(!L.length){toast('No hay repuestos vendidos este día');return}
+ try{await navigator.clipboard.writeText(soldDiaText(cajaDay));toast('Lista copiada')}catch(e){toast('No se pudo copiar')}
+}
 function setCajaDay(v){cajaDay=v||dISO(0);renderCaja()}
 function cajaHoy(){setCajaDay(dISO(0))}
 function cierresPendientes(){
@@ -2247,6 +2266,8 @@ function renderCaja(){
  const venHtml=venL.length?venL.map(n=>{const cr=crNo.get(n.no),its=(n.items||[]).map(i=>esc(i.name)+(i.qty>1?' ×'+i.qty:'')).join(' · '),hora=new Date(n.date).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
   const pend=cr?saldoCreditoDia(cr,cajaDay):0;
   return `<div class="list-row" style="cursor:pointer" onclick="showNote(${n.no})"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="list-meta" style="white-space:normal;line-height:1.45">${hora} · ${esc(n.pay||'Sin pago')} · ${(n.items||[]).length} ${pl((n.items||[]).length,'artículo','artículos')}${its?' · '+its:''}</div>${cr?`<div class="list-meta" style="margin-top:4px"><span class="badge ${pend>0?'warn':'ok'}">${pend>0?'Crédito pendiente '+money(pend)+' · no sumado':'Crédito pagado'}</span></div>`:''}</div><div class="list-amount"${pend>0?' style="opacity:.5"':''}>${money(n.total)}</div></div>`}).join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin notas este día</span></div>`;
+ const repL=repuestosDia(cajaDay),repUnits=repL.reduce((t,x)=>t+x.qty,0);
+ const repHtml=repL.length?repL.map(x=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('box')}</div><div class="list-main"><div class="list-title" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.35">${esc(x.name)}</div><div class="list-meta">${x.code?esc(x.code)+' · ':''}${x.notas.length===1?'Nota N.º '+String(x.notas[0]).padStart(5,'0'):x.notas.length+' notas'}</div></div><div><div class="list-amount" style="text-align:right">${x.qty} ${pl(x.qty,'ud','uds')}</div><div class="list-meta" style="text-align:right">${money(x.total)}</div></div></div>`).join(''):`<div class="empty-mini">${ico('box')}<span>Sin repuestos vendidos este día</span></div>`;
  const gHtml=d.gLs.length?d.gLs.map(g=>`<div class="list-row" style="cursor:pointer" onclick="showGasto('${g.id}')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">${esc(g.desc)}</div><div class="list-meta">${esc(g.cat||'Otros')} · pagado ${fFec(g.pago)} · ${esc(g.met||'Efectivo')}</div></div><div class="list-amount">${money(gUsd(g))}</div></div>`).join(''):`<div class="empty-mini">${ico('wallet')}<span>Sin gastos pagados este día</span></div>`;
  const arqRows=CJ_MET.map((k,i)=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Esperado ${money(d.esp[k]||0)}</div></div><div style="width:124px;flex:none"><input id="cj_${i}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${saved&&saved.contado&&saved.contado[k]!=null?saved.contado[k]:(+d.esp[k]||0).toFixed(2)}" oninput="cajaCalc()" aria-label="Contado en ${k}" style="margin:0"></div><div class="list-amount" id="cjd_${i}" style="min-width:82px;text-align:right">—</div></div>`).join('');
  const hist=(db.cierres||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
@@ -2256,6 +2277,7 @@ function renderCaja(){
  ${kpis}
  <div class="dash-grid">
   <section class="panel span-12">${phead('Ventas del día',venL.length?venL.length+' '+pl(venL.length,'nota','notas')+' · '+money(d.ventasTot)+' cobrado'+(d.creditoTot?' · '+money(d.creditoTot)+' a crédito pendiente':''):'Sin notas este día')}<div class="list">${venHtml}</div></section>
+  <section class="panel span-12">${phead('Repuestos vendidos',repL.length?`${repL.length} ${pl(repL.length,'repuesto','repuestos')} · ${repUnits} ${pl(repUnits,'unidad','unidades')} · incluye ventas a crédito`:'Sin repuestos vendidos este día',repL.length?`<button class="btn s g" onclick="copySoldDia()">${ico('download')} Copiar lista</button>`:'')}<div class="list">${repHtml}</div></section>
   <section class="panel span-6">${phead('Movimientos del día','Ventas, abonos y gastos')}<div class="list">${metHtml}</div></section>
   <section class="panel span-6">${phead('Abonos cobrados',abL.length?money(d.abonosTot):'Sin abonos este día',abL.length?`<button class="link-btn" onclick="goView('notes');setNotesFil('abonos')">Ver en Notas</button>`:'')}<div class="list">${abHtml}</div></section>
   <section class="panel span-8">${phead('Arqueo de caja','Los montos se llenan solos con lo esperado. Si tu conteo es distinto, corrígelo y guarda el cierre. Los gastos no se descuentan de la caja.')}<div class="list">${arqRows}</div><div class="panel-sub" id="cj_tot" style="margin-top:10px">—</div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="saveCierre()">${ico('check')} ${saved?'Guardar de nuevo':'Guardar cierre'}</button></div></section>
