@@ -1245,15 +1245,14 @@ function renderDash(){
  const yStart=new Date(today);yStart.setDate(yStart.getDate()-1);
  const monthStart=new Date(now.getFullYear(),now.getMonth(),1);
  const tNotes=notesIn(today,tomorrow),yNotes=notesIn(yStart,today),mNotes=notesIn(monthStart,tomorrow);
- const tTot=sumTot(tNotes),yTot=sumTot(yNotes),mTot=sumTot(mNotes),mProfit=mNotes.reduce((a,n)=>a+noteProfit(n),0),mExp=sumGastos(monthStart,tomorrow),gPendN=(db.gastos||[]).filter(g=>!g.pagado).length;
- const tCred=tNotes.reduce((a,n)=>a+(n.pay==='Crédito'?(+n.total||0):0),0);
+ const tTot=ventasCobradas(today,tomorrow),yTot=ventasCobradas(yStart,today),mTot=sumTot(mNotes),mProfit=mNotes.reduce((a,n)=>a+noteProfit(n),0),mExp=sumGastos(monthStart,tomorrow),gPendN=(db.gastos||[]).filter(g=>!g.pagado).length;
+ const tCred=creditoPendienteDia(dISO(0));
  let tAb=0;(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')===dISO(0))tAb+=(+x.usd||0)}));
- const tCob=Math.round((tTot-tCred+tAb)*100)/100;
  const admin=isAdmin(),units=db.parts.reduce((a,p)=>a+(+p.stock||0),0);
  const invCost=db.parts.reduce((a,p)=>a+(+p.stock||0)*(+p.cost||0),0);
  const invRetail=db.parts.reduce((a,p)=>a+(+p.stock||0)*pr(p,'bcv'),0);
  const low=lowParts(),zero=low.filter(p=>p.stock<=0);
- const days=[];for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const e=new Date(d);e.setDate(e.getDate()+1);days.push([d,sumTot(notesIn(d,e))])}
+ const days=[];for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const e=new Date(d);e.setDate(e.getDate()+1);days.push([d,ventasCobradas(d,e)])}
  const weekTot=days.reduce((a,d)=>a+d[1],0),best=days.reduce((a,d)=>d[1]>a[1]?d:a,days[0]);
  const hour=now.getHours(),greet=hour<12?'Buenos días':hour<19?'Buenas tardes':'Buenas noches';
  const rate=RATE?`<span>Tasa BCV</span><b>Bs ${bsf(RATE)}</b><small>${SET.par>0?'Paralelo Bs '+bsf(SET.par)+' · +'+pf(difPct()):'Diferencial +'+pf(difPct())}</small><button class="btn s" onclick="RATE?refreshRate():openCalc()">${ico('refresh')} ${RATE?'Actualizar':'Definir'}</button>`:`<span>Tasa BCV</span><b>—</b><small>Sin tasa cargada</small><button class="btn s" onclick="openCalc()">${ico('calc')} Definir tasa</button>`;
@@ -1264,7 +1263,7 @@ function renderDash(){
  }
  const trend=yTot?`<span class="trend ${tTot<yTot?'down':''}">${ico(tTot<yTot?'arrow-down':'arrow-up')}${Math.abs(Math.round((tTot-yTot)/yTot*100))}%</span><span>vs ayer</span>`:`<span class="badge info">${tTot?'Primer día con ventas':'Sin ventas hoy'}</span>`;
  const kpis=`<div class="kpi-grid">
- <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido hoy</div><div class="kpi-value">${money(tTot)}</div><div class="kpi-foot">${trend}${(tCred||tAb)?`<span>· Cobrado ${money(tCob)}${tAb?' (incluye abonos '+money(tAb)+')':''}</span>`:''}</div>${sparkHtml(days.map(d=>d[1]))}</div>
+ <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido hoy</div><div class="kpi-value">${money(tTot)}</div><div class="kpi-foot">${trend}${tAb?`<span>· abonos ${money(tAb)}</span>`:''}${tCred?`<span>· crédito pendiente ${money(tCred)}</span>`:''}</div>${sparkHtml(days.map(d=>d[1]))}</div>
  <div class="kpi"><div class="kpi-icon">${ico(admin?'chart':'wallet')}</div><div class="kpi-label">${admin?'Utilidad neta del mes':'Vendido este mes'}</div><div class="kpi-value">${money(admin?mProfit-mExp:mTot)}</div><div class="kpi-foot">${admin?`<span>Bruto ${money(mProfit)}</span><span>· Gastos ${money(mExp)}</span>`:`<span>${mNotes.length} nota${mNotes.length===1?'':'s'}</span>${tNotes.length?`<span>· ${money(tTot)} hoy</span>`:''}`}</div></div>
  <div class="kpi purple"><div class="kpi-icon">${ico('box')}</div><div class="kpi-label">${admin?'Inversión en inventario':'Inventario a la venta'}</div><div class="kpi-value">${money(admin?invCost:invRetail)}</div><div class="kpi-foot"><span>${db.parts.length} repuestos · ${units} uds</span></div></div>
  <div class="kpi warn"><div class="kpi-icon">${ico('alert')}</div><div class="kpi-label">Por reponer</div><div class="kpi-value">${low.length}</div><div class="kpi-foot">${zero.length?`<span class="badge danger">${zero.length} agotado${pl(zero.length,'','s')}</span>`:'<span class="badge ok">Stock saludable</span>'}</div></div>
@@ -1951,14 +1950,6 @@ function itemsNotaCredito(items,total){
  if(its.length&&Math.abs(dif)>=0.01)its.push({id:'',name:'Ajuste',code:'',qty:1,price:dif,cost:0});
  return its.length?its:[{id:'',name:'Venta a crédito',code:'',qty:1,price:total,cost:0}];
 }
-function sumarCreditoAlCierre(fecha,total){
- const c=(db.cierres||[]).find(x=>x.fecha===fecha);if(!c)return;
- c.ventas=c.ventas||{};
- c.ventas['Crédito']=Math.round(((c.ventas['Crédito']||0)+total)*100)/100;
- c.ventasTot=Math.round(((c.ventasTot||0)+total)*100)/100;
- c.creditoTot=Math.round(((c.creditoTot||0)+total)*100)/100;
- if(R)R.doc('cierres/'+fecha).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
-}
 let bfNotas=false;
 function backfillCreditosNotas(){
  if(bfNotas||!notesLoaded||!credLoaded||!cierresLoaded)return;
@@ -1977,7 +1968,6 @@ function backfillCreditosNotas(){
  ns.forEach(n=>{if(R)R.doc('notes/'+n.no).set(JSON.parse(JSON.stringify(n))).catch(se)});
  miss.forEach(f=>{if(R)R.doc('creditos/'+f.id).set(JSON.parse(JSON.stringify(f))).catch(se)});
  if(R)R.doc('config/seq').set({n:SEQ}).catch(se);else save();
- miss.forEach(f=>sumarCreditoAlCierre(String(f.fecha||'').slice(0,10),+f.total||0));
  toast(ns.length+(ns.length===1?' crédito pasado a nota':' créditos pasados a nota'));
  if(view==='notes'||view==='creditos'||view==='caja'||view==='dash')render();
 }
@@ -2146,7 +2136,7 @@ function saveCredito(){
  }
  db.creditos=(db.creditos||[]).filter(x=>x.id!==o.id).concat(o);
  syncCredito(o);
- if(nota){commit([],[nota]);if(R)R.doc('config/seq').set({n:SEQ}).catch(se);sumarCreditoAlCierre(o.fecha,o.total)}
+ if(nota){commit([],[nota]);if(R)R.doc('config/seq').set({n:SEQ}).catch(se)}
  if(ps.length)patchParts(ps);
  closeM();
  if(view==='creditos')renderCreditos();
@@ -2180,20 +2170,33 @@ function waCredito(id){
 const CJ_MET=['Efectivo','Pago móvil','Transferencia','Punto de venta','Zelle','Otro'];
 let cajaDay=dISO(0);
 function diaRange(day){const a=new Date(String(day)+'T00:00:00');const b=new Date(a);b.setDate(b.getDate()+1);return[a,b]}
+function saldoCreditoDia(f,day){const p=(f.abonos||[]).filter(x=>String(x.fecha||'')<=day).reduce((t,x)=>t+(+x.usd||0),0);return Math.max(0,Math.round(((+f.total||0)-p)*100)/100)}
+function ventasCobradas(a,b){
+ const cont=db.notes.filter(n=>!n.void&&n.pay!=='Crédito'&&new Date(n.date)>=a&&new Date(n.date)<b).reduce((t,n)=>t+(+n.total||0),0);
+ let ab=0;(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{const d=new Date(String(x.fecha||'')+'T12:00:00');if(d>=a&&d<b)ab+=(+x.usd||0)}));
+ return Math.round((cont+ab)*100)/100;
+}
+function creditoPendienteDia(day){
+ const[a,b]=diaRange(day);
+ return Math.round(db.notes.filter(n=>!n.void&&n.pay==='Crédito'&&new Date(n.date)>=a&&new Date(n.date)<b).reduce((t,n)=>{
+  const cr=(db.creditos||[]).find(f=>f.no===n.no);return t+(cr?saldoCreditoDia(cr,day):(+n.total||0));
+ },0)*100)/100;
+}
 function cajaData(day){
  const[a,b]=diaRange(day);
  const ns=db.notes.filter(n=>!n.void&&new Date(n.date)>=a&&new Date(n.date)<b);
- const ventas={},abonos={};let ventasTot=0,creditoTot=0;
- ns.forEach(n=>{const t=+n.total||0;ventasTot+=t;
-  if(n.pay==='Crédito'){creditoTot+=t;return}
-  const k=CJ_MET.includes(n.pay)?n.pay:'Otro';ventas[k]=(ventas[k]||0)+t});
+ const ventas={},abonos={};let ventasCont=0,creditoTot=0;
+ ns.forEach(n=>{const t=+n.total||0;
+  if(n.pay==='Crédito'){const cr=(db.creditos||[]).find(f=>f.no===n.no);creditoTot+=cr?saldoCreditoDia(cr,day):t;return}
+  ventasCont+=t;const k=CJ_MET.includes(n.pay)?n.pay:'Otro';ventas[k]=(ventas[k]||0)+t});
  let abonosTot=0;
  (db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')!==day)return;const k=CJ_MET.includes(x.met)?x.met:'Efectivo';abonos[k]=(abonos[k]||0)+(+x.usd||0);abonosTot+=(+x.usd||0)}));
  const gLs=(db.gastos||[]).filter(g=>g.pagado&&String(g.pago||'')===day);
  const gastos=Math.round(gLs.reduce((t,g)=>t+gUsd(g),0)*100)/100;
  const esp={};CJ_MET.forEach(k=>esp[k]=Math.round(((ventas[k]||0)+(abonos[k]||0))*100)/100);
  const esperado=Math.round(CJ_MET.reduce((t,k)=>t+esp[k],0)*100)/100;
- return{ns,ventas,ventasTot:Math.round(ventasTot*100)/100,creditoTot:Math.round(creditoTot*100)/100,abonos,abonosTot:Math.round(abonosTot*100)/100,gastos,gLs,esp,esperado};
+ const ventasTot=Math.round((ventasCont+abonosTot)*100)/100;
+ return{ns,ventas,ventasCont:Math.round(ventasCont*100)/100,ventasTot,creditoTot:Math.round(creditoTot*100)/100,abonos,abonosTot:Math.round(abonosTot*100)/100,gastos,gLs,esp,esperado};
 }
 function setCajaDay(v){cajaDay=v||dISO(0);renderCaja()}
 function cajaHoy(){setCajaDay(dISO(0))}
@@ -2225,16 +2228,15 @@ function renderCaja(){
  const d=cajaData(cajaDay),saved=(db.cierres||[]).find(c=>c.fecha===cajaDay);
  const pend=cierresPendientes();
  window._cjEsp=d.esp;
- const cobrado=Math.round((d.ventasTot-d.creditoTot+d.abonosTot)*100)/100;
- const pendHtml=pend.length?`<section class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3 class="panel-title" style="display:flex;align-items:center;gap:8px;color:var(--wa)">${ico('alert')} Cierres pendientes</h3><p class="panel-sub">Hay días con ventas que quedaron sin cierre. Abre el día, revisa el monto y guarda su cierre.</p></div></div><div class="list">${pend.map(day=>{const x=cajaData(day),cb=Math.round((x.ventasTot-x.creditoTot+x.abonosTot)*100)/100;return `<div class="list-row" style="cursor:default"><div class="thumb">${ico('clock')}</div><div class="list-main"><div class="list-title">${fFec(day)}</div><div class="list-meta">Vendido ${money(x.ventasTot)} · Cobrado ${money(cb)}${x.gastos?' · Gastos '+money(x.gastos):''}</div></div><button class="btn ok s" onclick="hacerCierre('${day}')">${ico('check')} Hacer cierre</button></div>`}).join('')}</div></section>`:'';
+ const pendHtml=pend.length?`<section class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3 class="panel-title" style="display:flex;align-items:center;gap:8px;color:var(--wa)">${ico('alert')} Cierres pendientes</h3><p class="panel-sub">Hay días con ventas que quedaron sin cierre. Abre el día, revisa el monto y guarda su cierre.</p></div></div><div class="list">${pend.map(day=>{const x=cajaData(day);return `<div class="list-row" style="cursor:default"><div class="thumb">${ico('clock')}</div><div class="list-main"><div class="list-title">${fFec(day)}</div><div class="list-meta">Cobrado ${money(x.ventasTot)}${x.creditoTot?' · Crédito pendiente '+money(x.creditoTot):''}${x.gastos?' · Gastos '+money(x.gastos):''}</div></div><button class="btn ok s" onclick="hacerCierre('${day}')">${ico('check')} Hacer cierre</button></div>`}).join('')}</div></section>`:'';
  const kpis=`<div class="kpi-grid">
-  <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido del día</div><div class="kpi-value">${money(d.ventasTot)}</div><div class="kpi-foot"><span>${d.ns.length} ${pl(d.ns.length,'nota','notas')}</span>${d.creditoTot?`<span>· Crédito ${money(d.creditoTot)}</span>`:''}</div></div>
-  <div class="kpi"><div class="kpi-icon">${ico('users')}</div><div class="kpi-label">Cobrado</div><div class="kpi-value">${money(cobrado)}</div><div class="kpi-foot"><span>Ventas ${money(d.ventasTot-d.creditoTot)} + abonos ${money(d.abonosTot)}</span></div></div>
+  <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido del día</div><div class="kpi-value">${money(d.ventasTot)}</div><div class="kpi-foot"><span>${d.ns.length} ${pl(d.ns.length,'nota','notas')}</span><span>· Ventas ${money(d.ventasCont)}${d.abonosTot?' + abonos '+money(d.abonosTot):''}</span>${d.creditoTot?`<span>· Crédito ${money(d.creditoTot)} sin sumar</span>`:''}</div></div>
+  <div class="kpi"><div class="kpi-icon">${ico('users')}</div><div class="kpi-label">Abonos cobrados</div><div class="kpi-value">${money(d.abonosTot)}</div><div class="kpi-foot">${d.abonosTot?'<span>Créditos pagados hoy</span><span>· se suman a la venta</span>':'<span>Sin abonos este día</span>'}</div></div>
   <div class="kpi warn"><div class="kpi-icon">${ico('wallet')}</div><div class="kpi-label">Gastos pagados</div><div class="kpi-value">${money(d.gastos)}</div><div class="kpi-foot"><span>${d.gLs.length} ${pl(d.gLs.length,'gasto','gastos')} del día</span><span>· Solo control, no afecta la caja</span></div></div>
   <div class="kpi purple"><div class="kpi-icon">${ico('calc')}</div><div class="kpi-label">Esperado en caja</div><div class="kpi-value">${money(d.esperado)}</div><div class="kpi-foot">${saved?'<span class="badge ok">Cierre guardado</span>':'<span class="badge warn">Falta cerrar</span>'}</div></div>
  </div>`;
  const metRows=CJ_MET.filter(k=>d.ventas[k]||d.abonos[k]).map(k=>`<div class="list-row" style="cursor:default"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Ventas ${money(d.ventas[k]||0)}${d.abonos[k]?` · Abonos ${money(d.abonos[k])}`:''}</div></div><div class="list-amount">${money((d.ventas[k]||0)+(d.abonos[k]||0))}</div></div>`);
- if(d.creditoTot)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Crédito</div><div class="list-meta">No entra a caja · queda por cobrar</div></div><div class="list-amount">${money(d.creditoTot)}</div></div>`);
+ if(d.creditoTot)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Crédito pendiente</div><div class="list-meta">No se suma hasta que lo paguen</div></div><div class="list-amount" style="opacity:.55">${money(d.creditoTot)}</div></div>`);
  if(d.gastos)metRows.push(`<div class="list-row" style="cursor:default"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">Gastos pagados</div><div class="list-meta">No se descuenta · solo control</div></div><div class="list-amount">${money(d.gastos)}</div></div>`);
  const metHtml=metRows.length?metRows.join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin movimientos este día</span></div>`;
  const abL=[];(db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>{if(String(x.fecha||'')===cajaDay)abL.push({...x,cliente:f.cliente,no:f.no,credito:f.id})}));
@@ -2243,7 +2245,8 @@ function renderCaja(){
  const crNo=new Map((db.creditos||[]).filter(f=>f.no).map(f=>[f.no,f]));
  const venL=d.ns.slice().sort((a,b)=>new Date(a.date)-new Date(b.date));
  const venHtml=venL.length?venL.map(n=>{const cr=crNo.get(n.no),its=(n.items||[]).map(i=>esc(i.name)+(i.qty>1?' ×'+i.qty:'')).join(' · '),hora=new Date(n.date).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'});
-  return `<div class="list-row" style="cursor:pointer" onclick="showNote(${n.no})"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="list-meta" style="white-space:normal;line-height:1.45">${hora} · ${esc(n.pay||'Sin pago')} · ${(n.items||[]).length} ${pl((n.items||[]).length,'artículo','artículos')}${its?' · '+its:''}</div>${cr?`<div class="list-meta" style="margin-top:4px"><span class="badge ${fPagado(cr)?'ok':'warn'}">${fPagado(cr)?'Crédito pagado':'Crédito · saldo '+money(fSaldo(cr))}</span></div>`:''}</div><div class="list-amount">${money(n.total)}</div></div>`}).join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin ventas este día</span></div>`;
+  const pend=cr?saldoCreditoDia(cr,cajaDay):0;
+  return `<div class="list-row" style="cursor:pointer" onclick="showNote(${n.no})"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="list-meta" style="white-space:normal;line-height:1.45">${hora} · ${esc(n.pay||'Sin pago')} · ${(n.items||[]).length} ${pl((n.items||[]).length,'artículo','artículos')}${its?' · '+its:''}</div>${cr?`<div class="list-meta" style="margin-top:4px"><span class="badge ${pend>0?'warn':'ok'}">${pend>0?'Crédito pendiente '+money(pend)+' · no sumado':'Crédito pagado'}</span></div>`:''}</div><div class="list-amount"${pend>0?' style="opacity:.5"':''}>${money(n.total)}</div></div>`}).join(''):`<div class="empty-mini">${ico('receipt')}<span>Sin notas este día</span></div>`;
  const gHtml=d.gLs.length?d.gLs.map(g=>`<div class="list-row" style="cursor:pointer" onclick="showGasto('${g.id}')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">${esc(g.desc)}</div><div class="list-meta">${esc(g.cat||'Otros')} · pagado ${fFec(g.pago)} · ${esc(g.met||'Efectivo')}</div></div><div class="list-amount">${money(gUsd(g))}</div></div>`).join(''):`<div class="empty-mini">${ico('wallet')}<span>Sin gastos pagados este día</span></div>`;
  const arqRows=CJ_MET.map((k,i)=>`<div class="list-row" style="cursor:default"><div class="list-main"><div class="list-title">${k}</div><div class="list-meta">Esperado ${money(d.esp[k]||0)}</div></div><div style="width:124px;flex:none"><input id="cj_${i}" type="number" step="0.01" min="0" inputmode="decimal" placeholder="0,00" value="${saved&&saved.contado&&saved.contado[k]!=null?saved.contado[k]:(+d.esp[k]||0).toFixed(2)}" oninput="cajaCalc()" aria-label="Contado en ${k}" style="margin:0"></div><div class="list-amount" id="cjd_${i}" style="min-width:82px;text-align:right">—</div></div>`).join('');
  const hist=(db.cierres||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
@@ -2252,7 +2255,7 @@ function renderCaja(){
  ${pendHtml}
  ${kpis}
  <div class="dash-grid">
-  <section class="panel span-12">${phead('Ventas del día',venL.length?venL.length+' '+pl(venL.length,'nota','notas')+' · '+money(d.ventasTot)+(d.creditoTot?' (incluye '+money(d.creditoTot)+' a crédito)':''):'Sin ventas este día')}<div class="list">${venHtml}</div></section>
+  <section class="panel span-12">${phead('Ventas del día',venL.length?venL.length+' '+pl(venL.length,'nota','notas')+' · '+money(d.ventasTot)+' cobrado'+(d.creditoTot?' · '+money(d.creditoTot)+' a crédito pendiente':''):'Sin notas este día')}<div class="list">${venHtml}</div></section>
   <section class="panel span-6">${phead('Movimientos del día','Ventas, abonos y gastos')}<div class="list">${metHtml}</div></section>
   <section class="panel span-6">${phead('Abonos cobrados',abL.length?money(d.abonosTot):'Sin abonos este día',abL.length?`<button class="link-btn" onclick="goView('notes');setNotesFil('abonos')">Ver en Notas</button>`:'')}<div class="list">${abHtml}</div></section>
   <section class="panel span-8">${phead('Arqueo de caja','Los montos se llenan solos con lo esperado. Si tu conteo es distinto, corrígelo y guarda el cierre. Los gastos no se descuentan de la caja.')}<div class="list">${arqRows}</div><div class="panel-sub" id="cj_tot" style="margin-top:10px">—</div><div class="row" style="margin-top:12px"><button class="btn ok" onclick="saveCierre()">${ico('check')} ${saved?'Guardar de nuevo':'Guardar cierre'}</button></div></section>
@@ -2275,9 +2278,9 @@ function waCierre(){
  const d=cajaData(cajaDay),saved=(db.cierres||[]).find(c=>c.fecha===cajaDay);
  let t='*GL Multitienda · Cierre de caja*\n'+fFec(cajaDay)+'\n\n';
  CJ_MET.forEach(k=>{const e=d.esp[k]||0,c=saved&&saved.contado?saved.contado[k]:null;if(e||c)t+='• '+k+': esperado '+money(e)+(c!=null?' · contado '+money(c):'')+'\n'});
- if(d.creditoTot)t+='• Crédito: '+money(d.creditoTot)+' (por cobrar)\n';
+ if(d.creditoTot)t+='• Crédito pendiente: '+money(d.creditoTot)+' (no se suma hasta que lo paguen)\n';
  if(d.gastos)t+='• Gastos del día: '+money(d.gastos)+' (solo control, no afecta la caja)\n';
- t+='\nVendido: '+money(d.ventasTot)+'\nCobrado: '+money(d.ventasTot-d.creditoTot+d.abonosTot)+'\nEsperado en caja: '+money(d.esperado);
+ t+='\nVendido y cobrado: '+money(d.ventasTot)+'\nEsperado en caja: '+money(d.esperado);
  if(saved)t+='\nDiferencia: '+((saved.difTotal>0?'+':saved.difTotal<0?'−':'')+money(Math.abs(saved.difTotal)));
  window.open('https://wa.me/?text='+encodeURIComponent(t),'_blank');
 }
@@ -2300,7 +2303,7 @@ function renderNotes(){
    <div class="doc-meta" style="margin-top:5px"><span class="badge ${pag?'ok':'warn'}">${pag?'Crédito pagado':'Crédito pendiente'}</span><span>Abonado ${money(fAbonado(f))} de ${money(f.total)}</span><span>·</span><span>Saldo ${money(fSaldo(f))}</span></div></div>
    <div class="doc-amount">${money(x.usd)}</div></div>`}).join('')}</div>`:`<div class="empty-state"><div class="empty-ico">${ico('dollar')}</div><h3>Aún no hay abonos</h3><p>Cuando un cliente pague su crédito, el abono aparecerá aquí y sumará al Cobrado del cierre de caja.</p><button class="btn" onclick="goView('creditos')">${ico('users')} Ver créditos</button></div>`;
   $('#app').innerHTML=`<div class="page-toolbar">${seg}<span class="badge ok">${abL.length} ${pl(abL.length,'abono','abonos')} · ${money(abTot)} cobrado</span></div>
-  <div class="notice-bar">${ico('dollar')}<span><b>Los abonos no generan una nota nueva</b>: la venta ya se registró a crédito. Aquí ves cada pago y en el Cierre de caja suman al <b>Cobrado</b> del día.</span></div>${html}`;
+  <div class="notice-bar">${ico('dollar')}<span><b>Los abonos no generan una nota nueva</b>: la venta ya se registró a crédito. Aquí ves cada pago y en el Cierre de caja suman a la <b>venta del día</b>.</span></div>${html}`;
   return;
  }
  if(!db.notes.length){$('#app').innerHTML=moreNotes()+`<div class="page-toolbar">${seg}</div><div class="empty-state"><div class="empty-ico">${ico('receipt')}</div><h3>Aún no hay notas de entrega</h3><p>Cuando vendas un repuesto se genera la nota automáticamente, con cliente, precios y total en Bs.</p><button class="btn" onclick="goView('sell')">${ico('cart')} Crear una venta</button></div>`;return}
