@@ -1275,6 +1275,10 @@ function renderDash(){
  const topPanel=`<section class="panel span-6">${phead('Más vendidos','Unidades del mes','<button class="link-btn" onclick="goView(\'rep\')">Ver reportes</button>')}<div class="list">${topHtml}</div></section>`;
  const lowHtml=low.length?low.slice(0,6).map(p=>`<div class="list-row"><div class="thumb">${ico('box')}</div><div class="list-main"><div class="list-title">${esc(p.name)}</div><div class="list-meta">${esc(p.code||'Sin código')} · ${esc(p.brand||'—')}</div></div><span class="badge ${p.stock<=0?'danger':'warn'}">${p.stock<=0?'Agotado':'Queda '+p.stock}</span></div>`).join(''):`<div class="empty-mini">${ico('check')}<span>Todo el inventario tiene stock suficiente</span></div>`;
  const lowPanel=`<section class="panel span-6">${phead('Reposición sugerida',low.length?low.length+' '+pl(low.length,'repuesto','repuestos')+' con 1 unidad o menos':'Sin urgencias de stock',low.length?`<button class="btn s g" onclick="goView('rep')">${ico('arrow-right')} Gestionar</button>`:'')}<div class="list">${lowHtml}</div></section>`;
+ const pendD=cierresPendientes();
+ const pd0=pendD.length?cajaData(pendD[0]):null;
+ const pdLbl=pd0?(pd0.ventasTot?'Vendido '+money(pd0.ventasTot):'Abonos '+money(pd0.abonosTot)):'';
+ const cierreNotice=pendD.length?`<div class="notice-bar" style="margin-bottom:14px">${ico('alert')}<span><b>Falta el cierre del ${fFec(pendD[0])}.</b> ${pdLbl}${pendD.length>1?' · y '+(pendD.length-1)+' día'+(pendD.length>2?'s':'')+' más':''}. Haz el cierre para dejar la caja al día.</span><button class="btn s ok" onclick="hacerCierre('${pendD[0]}')">${ico('dollar')} Hacer cierre</button></div>`:'';
  const recent=db.notes.filter(n=>!n.void).slice(0,5);
  const recentHtml=recent.length?recent.map(n=>`<div class="list-row" style="cursor:pointer" onclick="showNote(${n.no})"><div class="thumb">${ico('receipt')}</div><div class="list-main"><div class="list-title">Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="list-meta">${new Date(n.date).toLocaleString('es')} · ${esc(n.pay||'Sin pago')}${n.ci?' · '+esc(n.ci):''}</div></div><div class="list-amount">${money(n.total)}</div></div>`).join(''):`<div class="empty-mini">${ico('receipt')}<span>Aún no hay notas de entrega</span></div>`;
  const recentPanel=`<section class="panel span-8">${phead('Últimas notas',recent.length?'Las 5 más recientes':'Sin notas emitidas','<button class="link-btn" onclick="goView(\'notes\')">Ver todas</button>')}<div class="list">${recentHtml}</div></section>`;
@@ -1284,9 +1288,9 @@ function renderDash(){
  <div class="list-row" style="cursor:pointer" onclick="goView('cli')"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Clientes</div><div class="list-meta">${clients().length} con historial de compras</div></div>${ico('arrow-right')}</div>
  <div class="list-row" style="cursor:pointer" onclick="goView('gastos')"><div class="thumb">${ico('wallet')}</div><div class="list-main"><div class="list-title">Gastos</div><div class="list-meta">${money(mExp)} este mes${gPendN?' · '+gPendN+' por pagar':''}</div></div>${ico('arrow-right')}</div>
  <div class="list-row" style="cursor:pointer" onclick="goView('creditos')"><div class="thumb">${ico('users')}</div><div class="list-main"><div class="list-title">Créditos</div><div class="list-meta">${fCobrar()?money(fCobrar())+' por cobrar':'Sin deudas pendientes'}</div></div>${ico('arrow-right')}</div>
- <div class="list-row" style="cursor:pointer" onclick="goView('caja')"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">Cierre de caja</div><div class="list-meta">${(db.cierres||[]).some(c=>c.fecha===dISO(0))?'Día cerrado':'Falta cerrar el día'}</div></div>${ico('arrow-right')}</div>
+ <div class="list-row" style="cursor:pointer" onclick="${pendD.length?`hacerCierre('${pendD[0]}')`:`goView('caja')`}"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">Cierre de caja</div><div class="list-meta">${pendD.length?'Falta el cierre del '+fFec(pendD[0]):(db.cierres||[]).some(c=>c.fecha===dISO(0))?'Día cerrado':'Falta cerrar el día'}</div></div>${ico('arrow-right')}</div>
  </div>${LOGO?`<div class="panel-sub" style="margin-top:12px">Logo de la tienda cargado</div>`:''}</section>`;
- $('#app').innerHTML=head+kpis+`<div class="dash-grid">${chart}${donut}${topPanel}${lowPanel}${recentPanel}${mini}</div>`;
+ $('#app').innerHTML=head+cierreNotice+kpis+`<div class="dash-grid">${chart}${donut}${topPanel}${lowPanel}${recentPanel}${mini}</div>`;
 }
 async function refreshRate(){const ok=await fetchRate(true);toast(ok?'Tasa BCV actualizada':'No se pudo actualizar la tasa');}
 function search(ph='Buscar por nombre, código o marca…'){return `<div class="search-field">${ico('search')}<input id="q" type="search" autocomplete="off" placeholder="${ph}" value="${esc(q)}" oninput="q=this.value;refreshList()"></div>`}
@@ -1523,7 +1527,9 @@ function importDb(inp){const f=inp.files[0];if(!f)return;const r=new FileReader(
 
 /* ---------- VENDER ---------- */
 function renderSell(){
- $('#app').innerHTML=`<div class="sell-layout"><div><div class="page-toolbar">${search('Buscar repuesto para vender…')}</div><div id="list" class="sell-list">${sellList()}</div></div><div id="cartBox"></div></div>`;
+ const pend=cierresPendientes();
+ const pendBar=pend.length?`<div class="notice-bar" style="margin-bottom:12px">${ico('alert')}<span><b>Cierre pendiente del ${fFec(pend[0])}.</b> Antes de seguir vendiendo, haz el cierre de ese día.</span><button class="btn s ok" onclick="hacerCierre('${pend[0]}')">${ico('dollar')} Hacer cierre</button></div>`:'';
+ $('#app').innerHTML=`${pendBar}<div class="sell-layout"><div><div class="page-toolbar">${search('Buscar repuesto para vender…')}</div><div id="list" class="sell-list">${sellList()}</div></div><div id="cartBox"></div></div>`;
  renderCart();
 }
 function sellList(){
@@ -1562,6 +1568,8 @@ function renderCart(){
  <button class="btn ok wide" style="margin-top:12px" ${cart.length?'':'disabled'} onclick="checkout()">${ico('check')} Vender y generar nota</button></div>`;
 }
 function checkout(){
+ const pend=cierresPendientes();
+ if(pend.length&&!confirm('Tienes el cierre pendiente del '+fFec(pend[0])+'.\n\nAceptar = vender igual.\nCancelar = ir a hacer ese cierre ahora.')){hacerCierre(pend[0]);return}
  for(const c of cart){const p=find(c.id);if(c.qty>p.stock){alert(`Stock insuficiente de ${p.name}`);return}}
  if(payMethod==='Crédito'&&!client.name.trim()){alert('Escribe el nombre del cliente para registrar el crédito.');return}
  const ps=[],items=cart.map(c=>{const p=find(c.id);p.stock-=c.qty;ps.push([p.id,{stock:p.stock}]);return{id:c.id,name:p.name,code:p.code,qty:c.qty,price:c.price,cost:p.cost||0}});
@@ -2136,6 +2144,17 @@ function cajaData(day){
 }
 function setCajaDay(v){cajaDay=v||dISO(0);renderCaja()}
 function cajaHoy(){setCajaDay(dISO(0))}
+function cierresPendientes(){
+ const hoy=dISO(0);
+ const hechos=(db.cierres||[]).map(c=>String(c.fecha||'')).filter(Boolean).sort();
+ const desde=hechos.length?hechos[0]:dISO(-1),done=new Set(hechos),days=new Set();
+ const add=d=>{d=String(d||'').slice(0,10);if(/^\d{4}-\d{2}-\d{2}$/.test(d)&&d<hoy&&d>=desde&&!done.has(d))days.add(d)};
+ (db.notes||[]).filter(n=>!n.void).forEach(n=>add(n.date));
+ (db.creditos||[]).forEach(f=>(f.abonos||[]).forEach(x=>add(x.fecha)));
+ (db.gastos||[]).filter(g=>g.pagado).forEach(g=>add(g.pago));
+ return [...days].sort().reverse();
+}
+function hacerCierre(day){cajaDay=day||dISO(0);goView('caja')}
 function cajaCalc(){
  const esp=window._cjEsp||{};let te=0,tt=0,td=0,any=false;
  CJ_MET.forEach((k,i)=>{const inp=document.getElementById('cj_'+i),raw=inp?String(inp.value).trim():'',has=raw!=='';
@@ -2151,8 +2170,10 @@ function cajaCalc(){
 }
 function renderCaja(){
  const d=cajaData(cajaDay),saved=(db.cierres||[]).find(c=>c.fecha===cajaDay);
+ const pend=cierresPendientes();
  window._cjEsp=d.esp;
  const cobrado=Math.round((d.ventasTot-d.creditoTot+d.abonosTot)*100)/100;
+ const pendHtml=pend.length?`<section class="panel" style="margin-bottom:14px"><div class="panel-head"><div><h3 class="panel-title" style="display:flex;align-items:center;gap:8px;color:var(--wa)">${ico('alert')} Cierres pendientes</h3><p class="panel-sub">Hay días con ventas que quedaron sin cierre. Abre el día, revisa el monto y guarda su cierre.</p></div></div><div class="list">${pend.map(day=>{const x=cajaData(day),cb=Math.round((x.ventasTot-x.creditoTot+x.abonosTot)*100)/100;return `<div class="list-row" style="cursor:default"><div class="thumb">${ico('clock')}</div><div class="list-main"><div class="list-title">${fFec(day)}</div><div class="list-meta">Vendido ${money(x.ventasTot)} · Cobrado ${money(cb)}${x.gastos?' · Gastos '+money(x.gastos):''}</div></div><button class="btn ok s" onclick="hacerCierre('${day}')">${ico('check')} Hacer cierre</button></div>`}).join('')}</div></section>`:'';
  const kpis=`<div class="kpi-grid">
   <div class="kpi ok"><div class="kpi-icon">${ico('dollar')}</div><div class="kpi-label">Vendido del día</div><div class="kpi-value">${money(d.ventasTot)}</div><div class="kpi-foot"><span>${d.ns.length} ${pl(d.ns.length,'nota','notas')}</span>${d.creditoTot?`<span>· Crédito ${money(d.creditoTot)}</span>`:''}</div></div>
   <div class="kpi"><div class="kpi-icon">${ico('users')}</div><div class="kpi-label">Cobrado</div><div class="kpi-value">${money(cobrado)}</div><div class="kpi-foot"><span>Ventas ${money(d.ventasTot-d.creditoTot)} + abonos ${money(d.abonosTot)}</span></div></div>
@@ -2171,6 +2192,7 @@ function renderCaja(){
  const hist=(db.cierres||[]).slice().sort((a,b)=>String(b.fecha).localeCompare(String(a.fecha))).slice(0,6);
  const histHtml=hist.length?hist.map(c=>`<div class="list-row" style="cursor:pointer" onclick="setCajaDay('${c.fecha}')"><div class="thumb">${ico('dollar')}</div><div class="list-main"><div class="list-title">${fFec(c.fecha)}</div><div class="list-meta">Vendido ${money(c.ventasTot)} · Contado ${money(c.contadoTot||0)}</div></div><span class="badge ${c.difTotal===0?'ok':Math.abs(c.difTotal)<=1?'warn':'danger'}">${c.difTotal===0?'Cuadrado':(c.difTotal>0?'+':'−')+money(Math.abs(c.difTotal||0))}</span></div>`).join(''):`<div class="empty-mini">${ico('clock')}<span>Aún no hay cierres guardados</span></div>`;
  $('#app').innerHTML=`<div class="page-toolbar"><div class="toolbar-actions" style="margin-left:0"><input type="date" value="${cajaDay}" onchange="setCajaDay(this.value)" style="width:auto;margin:0" aria-label="Día del cierre"><button class="btn g s" onclick="cajaHoy()">${ico('clock')} Hoy</button></div><div class="toolbar-actions"><button class="btn g s" onclick="waCierre()">${ico('users')} Enviar cierre</button></div></div>
+ ${pendHtml}
  ${kpis}
  <div class="dash-grid">
   <section class="panel span-6">${phead('Movimientos del día','Ventas, abonos y gastos')}<div class="list">${metHtml}</div></section>
