@@ -1255,7 +1255,7 @@ function renderDash(){
  const days=[];for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);const e=new Date(d);e.setDate(e.getDate()+1);days.push([d,ventasCobradas(d,e)])}
  const weekTot=days.reduce((a,d)=>a+d[1],0),best=days.reduce((a,d)=>d[1]>a[1]?d:a,days[0]);
  const hour=now.getHours(),greet=hour<12?'Buenos días':hour<19?'Buenas tardes':'Buenas noches';
- const rate=RATE?`<span>Tasa BCV</span><b>Bs ${bsf(RATE)}</b><small>${SET.par>0?'Paralelo Bs '+bsf(SET.par)+' · +'+pf(difPct()):'Diferencial +'+pf(difPct())}</small><button class="btn s" onclick="RATE?refreshRate():openCalc()">${ico('refresh')} ${RATE?'Actualizar':'Definir'}</button>`:`<span>Tasa BCV</span><b>—</b><small>Sin tasa cargada</small><button class="btn s" onclick="openCalc()">${ico('calc')} Definir tasa</button>`;
+ const rate=RATE?`<span>Tasa BCV</span><b>Bs ${bsf(RATE)}</b><small>${SET.par>0?'Paralelo Bs '+bsf(SET.par)+' · +'+pf(difPct()):'Diferencial +'+pf(difPct())}${!RATE_MAN&&RATE_INFO&&RATE_INFO.fecha?' · Valor '+fFec(RATE_INFO.fecha):''}</small><button class="btn s" onclick="RATE?refreshRate():openCalc()">${ico('refresh')} ${RATE?'Actualizar':'Definir'}</button>`:`<span>Tasa BCV</span><b>—</b><small>Sin tasa cargada</small><button class="btn s" onclick="openCalc()">${ico('calc')} Definir tasa</button>`;
  const head=`<section class="dash-head"><div class="dash-copy"><p class="eyebrow">Panel de control</p><h2>${greet}</h2><p>${mNotes.length?mNotes.length+' '+pl(mNotes.length,'venta','ventas')+' este mes por '+money(mTot)+'.':'Aún no registras ventas este mes.'}</p><div class="quick-actions"><button class="btn ok" onclick="goView('sell')">${ico('cart')} Nueva venta</button><button class="btn g" onclick="editPart()">${ico('plus')} Repuesto</button><button class="btn g" onclick="openBulk()">${ico('download')} Carga rápida</button></div></div><div class="rate-card">${rate}</div></section>`;
  if(!db.parts.length&&!db.notes.length){
   $('#app').innerHTML=`<section class="hero"><div class="hero-copy"><p class="eyebrow">Bienvenido</p><h2>Todo tu negocio, ordenado desde el primer repuesto.</h2><p>Registra inventario, calcula precios en dólares y bolívares, y emite notas de entrega en segundos. Funciona sin conexión y se sincroniza entre tus dispositivos.</p><ul class="hero-steps"><li><span class="step-num">1</span>Agrega repuestos uno por uno o pega la nota de compra completa.</li><li><span class="step-num">2</span>Define la tasa BCV y el diferencial para obtener precios BCV, CASH y MercadoLibre.</li><li><span class="step-num">3</span>Vende, genera la nota y controla tus ganancias desde el resumen.</li></ul><div class="quick-actions"><button class="btn ok" onclick="editPart()">${ico('plus')} Nuevo repuesto</button><button class="btn g" onclick="openBulk()">${ico('download')} Carga rápida</button><button class="btn g" onclick="openCalc()">${ico('calc')} Tasa BCV</button></div></div><div class="hero-art"><img src="assets/dashboard-hero.png" alt="Ilustración de una tienda de repuestos organizada"></div></section>`;
@@ -1294,7 +1294,7 @@ function renderDash(){
  </div>${LOGO?`<div class="panel-sub" style="margin-top:12px">Logo de la tienda cargado</div>`:''}</section>`;
  $('#app').innerHTML=head+cierreNotice+kpis+`<div class="dash-grid">${chart}${donut}${topPanel}${lowPanel}${recentPanel}${mini}</div>`;
 }
-async function refreshRate(){const ok=await fetchRate(true);toast(ok?'Tasa BCV actualizada':'No se pudo actualizar la tasa');}
+async function refreshRate(){const ok=await fetchRate(true);toast(ok?'Tasa BCV actualizada: Bs '+bsf(RATE)+(RATE_INFO&&RATE_INFO.fecha?' · valor '+fFec(RATE_INFO.fecha):''):'No se pudo actualizar la tasa');}
 function search(ph='Buscar por nombre, código o marca…'){return `<div class="search-field">${ico('search')}<input id="q" type="search" autocomplete="off" placeholder="${ph}" value="${esc(q)}" oninput="q=this.value;refreshList()"></div>`}
 function bsf(n){return (+n||0).toLocaleString('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2})}
 function pctBtns(i){if(!isAdmin())return '';return i==='f_pbcv'?`<div class="acts"><button type="button" class="btn s g" onclick="applyPct(50)">+50%</button><button type="button" class="btn s g" onclick="applyPct(100)">+100%</button></div>`:`<div class="acts"><button type="button" class="btn s g" onclick="cashFromBcv(true)">−${SET.disc}% del BCV</button></div>`}
@@ -1313,33 +1313,54 @@ function costChg(){
 function applyPct(pc){const c=+document.getElementById('f_cost').value||0;if(!(c>0)){alert('Primero escribe el costo');return}const b=document.getElementById('f_pbcv');b.dataset.pct=pc;b.dataset.man='';b.value=Math.round(c*(1+pc/100)*(1+difPct()/100)*100)/100;cashFromBcv(false);const p=document.getElementById('f_pcash'),m=document.getElementById('f_pml');if(m){m.dataset.man='';m.dataset.mm='';m.value=Math.round(mlPrice(+((p&&p.value)||0))*100)/100}ganPrev()}
 function loadRate(){try{const t=JSON.parse(localStorage.getItem('glm_rate')||'null');if(t&&t.rate>0){RATE=t.rate;RATE_INFO=t.info||null;RATE_MAN=!!t.man&&!!t.info&&t.info.manDate===new Date().toISOString().slice(0,10)}}catch(e){}rateUI()}
 function saveRate(){try{localStorage.setItem('glm_rate',JSON.stringify({rate:RATE,man:RATE_MAN,info:RATE_INFO}))}catch(e){}}
-function rateInfoTxt(){return RATE_MAN?'Tasa manual de hoy. Toca "Actualizar" para volver a la automática.':RATE_INFO&&RATE_INFO.src?'Automática · Fuente: '+RATE_INFO.src+' · Fecha valor: '+(RATE_INFO.fecha||'—'):'No se pudo traer la tasa automática. Escríbela a mano.'}
+function rateInfoTxt(){return RATE_MAN?'Tasa manual de hoy. Toca "Actualizar" para volver a la automática.':RATE_INFO&&RATE_INFO.src?'Automática · '+RATE_INFO.src+' · Fecha valor '+fFec(RATE_INFO.fecha):'No se pudo traer la tasa automática. Escríbela a mano.'}
 function rateUI(){
  parUI();
  const b=document.getElementById('rateBtn');
- if(b){const s=b.querySelector('span');if(s)s.textContent=RATE?'Bs '+bsf(RATE):'Tasa BCV';b.title=RATE?'Tasa BCV: Bs '+bsf(RATE)+' por $':'Definir la tasa BCV';}
+ if(b){const s=b.querySelector('span');if(s)s.textContent=RATE?'Bs '+bsf(RATE):'Tasa BCV';b.title=RATE?'Tasa BCV: Bs '+bsf(RATE)+' por $'+(RATE_INFO&&RATE_INFO.fecha?' · fecha valor '+fFec(RATE_INFO.fecha):''):'Definir la tasa BCV';}
  const i=document.getElementById('c_info');if(i)i.textContent=rateInfoTxt();
  const typing=document.activeElement&&/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
  if(!document.getElementById('modal').classList.contains('on')&&!typing){if(view==='dash'&&document.getElementById('pageTitle'))renderDash();else if(document.getElementById('list'))refreshList();}
 }
+async function getJSON(u,ms){
+ const c=new AbortController(),t=setTimeout(()=>c.abort(),ms||8000);
+ try{const r=await fetch(u,{signal:c.signal,cache:'no-store'});return r.ok?await r.json():null}catch(e){return null}finally{clearTimeout(t)}
+}
+function rateFromJson(j,src,prio){
+ if(!j)return null;
+ const v=+(j.promedio??j.venta??j.valor??0);
+ if(!(v>0))return null;
+ return{v,fecha:String(j.fechaActualizacion||j.fecha||j.date||'').slice(0,10),src,prio};
+}
+async function bcvProxy(u){
+ const c=new AbortController(),t=setTimeout(()=>c.abort(),9000);
+ try{
+  const r=await fetch(u,{signal:c.signal,cache:'no-store'});if(!r.ok)return null;
+  const h=await r.text(),m=h.match(/id="dolar"[\s\S]{0,2000}?<strong[^>]*>\s*([\d.,]+)\s*<\/strong>/);
+  if(!m)return null;
+  const f=h.match(/Fecha Valor[\s\S]{0,300}?content="(\d{4}-\d{2}-\d{2})/);
+  return{v:+m[1].replace(/\./g,'').replace(',','.'),fecha:f?f[1]:'',src:'bcv.org.ve',prio:4};
+ }catch(e){return null}finally{clearTimeout(t)}
+}
 async function fetchRate(force){
  if(RATE_MAN&&!force)return false;
- const srcs=[
-  ['https://api-dolar.leandrus.net/v1/dolares/oficial/siguiente','json'],
-  ['https://api-dolar.leandrus.net/v1/dolares/oficial','json'],
-  ['https://ve.dolarapi.com/v1/dolares/oficial','json'],
-  ['https://api.allorigins.win/raw?url='+encodeURIComponent('https://www.bcv.org.ve/'),'bcv']];
- for(const [u,k] of srcs){
-  try{
-   const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),8000);
-   const res=await fetch(u,{signal:ctl.signal});clearTimeout(t);if(!res.ok)continue;
-   let v=0,fecha='';
-   if(k==='json'){const j=await res.json();v=+(j.promedio??j.venta);fecha=String(j.fechaActualizacion||'').slice(0,10)}
-   else{const m=(await res.text()).match(/id="dolar"[\s\S]*?<strong>\s*([\d.,]+)\s*<\/strong>/);if(m)v=+m[1].replace(/\./g,'').replace(',','.')}
-   if(v>1&&v<1e6){RATE=v;RATE_MAN=false;RATE_INFO={fecha,src:k==='bcv'?'bcv.org.ve (vía proxy)':new URL(u).hostname+(u.endsWith('/siguiente')?' (próxima fecha valor)':'')};saveRate();rateUI();maybeAutoRecalc('tasa BCV actualizada');return true}
-  }catch(e){}
- }
- rateUI();return false;
+ const s=Date.now(),bcv=encodeURIComponent('https://www.bcv.org.ve/');
+ const pick=rs=>rs.filter(r=>r.status==='fulfilled'&&r.value&&r.value.v>1&&r.value.v<1e6).map(r=>r.value);
+ let ok=pick(await Promise.allSettled([
+  getJSON('https://rates.dolarvzla.com/bcv/current.json?t='+s).then(j=>j&&j.current&&+j.current.usd>0?{v:+j.current.usd,fecha:String(j.current.date||'').slice(0,10),src:'BCV · DolarVZLA',prio:3}:null),
+  getJSON('https://ve.dolarapi.com/v1/dolares/oficial?t='+s).then(j=>rateFromJson(j,'DolarAPI',2)),
+  getJSON('https://api-dolar.leandrus.net/v1/dolares/oficial/siguiente?t='+s).then(j=>rateFromJson(j,'BCV · próxima fecha valor',2)),
+  getJSON('https://api-dolar.leandrus.net/v1/dolares/oficial?t='+s).then(j=>rateFromJson(j,'Leandrus',1))
+ ]));
+ if(!ok.length)ok=pick(await Promise.allSettled([
+  bcvProxy('https://api.allorigins.win/raw?url='+bcv+'&_='+s),
+  bcvProxy('https://api.codetabs.com/v1/proxy?quest='+bcv)
+ ]));
+ if(!ok.length){rateUI();return false}
+ ok.sort((a,b)=>String(b.fecha||'').localeCompare(String(a.fecha||''))||(b.prio-a.prio));
+ const best=ok[0];
+ if(!force&&RATE>0&&RATE_INFO&&RATE_INFO.fecha&&String(best.fecha||'')<String(RATE_INFO.fecha)){rateUI();return false}
+ RATE=best.v;RATE_MAN=false;RATE_INFO={fecha:best.fecha,src:best.src};saveRate();rateUI();maybeAutoRecalc('tasa BCV actualizada');return true;
 }
 function rateIn(){const v=+document.getElementById('c_rate').value;if(!(v>0))return;RATE=v;RATE_MAN=true;RATE_INFO={manDate:new Date().toISOString().slice(0,10)};saveRate();rateUI();calcFrom('usd');maybeAutoRecalc('tasa BCV manual')}
 function calcFrom(k){const u=document.getElementById('c_usd'),b=document.getElementById('c_bs');if(!RATE)return;if(k==='usd'){const v=+u.value;b.value=v?Math.round(v*RATE*100)/100:''}else{const v=+b.value;u.value=v?Math.round(v/RATE*100)/100:''}}
