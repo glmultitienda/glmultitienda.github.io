@@ -1740,22 +1740,26 @@ function bulkGuarda(){
   return{id:p.id,code,brand:r.brand||'',name:r.name,qty:r.qty,cost:r.cost};
  });
  const total=Math.round(items.reduce((a,i)=>a+i.qty*i.cost,0)*100)/100;
- const c={id,ts:Date.now(),prov:BLK.prov||'Sin proveedor',num:BLK.num,fecha:BLK.fecha,recibido:BLK.recibido,credito:BLK.credito,vence:BLK.credito==='credito'?BLK.vence:null,items,total,unidades:bulkUnid(),foto:BLK.foto||null,anulado:false,anuladoDate:null};
+ const pagado=BLK.credito!=='credito';
+ const c={id,ts:Date.now(),prov:BLK.prov||'Sin proveedor',num:BLK.num,fecha:BLK.fecha,recibido:BLK.recibido,credito:BLK.credito,vence:BLK.credito==='credito'?BLK.vence:null,pagado,pagoFecha:pagado?(BLK.recibido||BLK.fecha||dISO(0)):null,items,total,unidades:bulkUnid(),foto:BLK.foto||null,anulado:false,anuladoDate:null};
  db.compras.unshift(c);
  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);
  patchParts(patches);commit(ps);
  closeM();goView('compras');
  alert('Compra guardada: '+items.length+' '+pl(items.length,'artículo','artículos')+', '+bulkUnid()+' uds, '+money(total)+'.\nEl inventario se actualizó.');
 }
+function compPagada(c){return c.pagado===true||(c.pagado!==false&&c.credito!=='credito')}
 function editCompra(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  const isCred=c.credito==='credito';
+ const pag=compPagada(c);
  $('#box').innerHTML=`<h3 style="margin:0 0 4px;display:flex;align-items:center;gap:8px">${ico('edit')} Datos de la compra</h3>
  <div class="mu" style="margin:4px 0 8px">${(c.items||[]).length} ${pl((c.items||[]).length,'artículo','artículos')} · ${c.unidades||0} uds · ${money(c.total||0)}</div>
  <label>Empresa / Proveedor</label><input id="e_prov" value="${esc(c.prov||'')}">
  <label>N.º de factura</label><input id="e_num" value="${esc(c.num||'')}">
  <div style="display:flex;gap:8px"><div style="flex:1"><label>Fecha de emisión</label><input id="e_fecha" type="date" value="${(c.fecha||'').slice(0,10)}"></div><div style="flex:1"><label>Fecha de recepción</label><input id="e_rec" type="date" value="${(c.recibido||'').slice(0,10)}"></div></div>
  <div style="display:flex;gap:8px"><div style="flex:1"><label>Forma de pago</label><select id="e_cred" onchange="eCred(this.value)"><option value="contado" ${isCred?'':'selected'}>Contado</option><option value="credito" ${isCred?'selected':''}>A crédito</option></select></div><div style="flex:1" id="e_venceBox"><label>Vencimiento</label><input id="e_vence" type="date" value="${(c.vence||'').slice(0,10)||dISO(30)}"></div></div>
+ <label class="mu" style="display:flex;align-items:center;gap:8px;cursor:pointer;margin-top:10px"><input type="checkbox" id="e_pag" ${pag?'checked':''} style="width:auto;height:auto;min-height:0"> Factura pagada</label>
  <div class="row" style="margin-top:16px"><button class="btn" onclick="saveCompraData('${c.id}')">${ico('check')} Guardar</button><button class="btn g" onclick="showCompra('${c.id}')">Cancelar</button></div>`;
  $('#modal').classList.add('on');
  eCred(isCred?'credito':'contado');
@@ -1765,26 +1769,46 @@ function saveCompraData(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  c.prov=$('#e_prov').value.trim()||'Sin proveedor';
  c.num=$('#e_num').value.trim();
- const fe=$('#e_fecha'),rc=$('#e_rec'),cr=$('#e_cred'),vn=$('#e_vence');
+ const fe=$('#e_fecha'),rc=$('#e_rec'),cr=$('#e_cred'),vn=$('#e_vence'),pg=$('#e_pag');
  if(fe&&fe.value)c.fecha=fe.value;
  if(rc&&rc.value)c.recibido=rc.value;
  if(cr)c.credito=cr.value;
  if(cr&&cr.value==='credito'&&vn&&vn.value)c.vence=vn.value;
  if(cr&&cr.value!=='credito')c.vence=null;
+ const wasPag=compPagada(c);
+ const nowPag=pg?pg.checked:false;
+ c.pagado=nowPag;
+ if(nowPag&&!wasPag&&!c.pagoFecha)c.pagoFecha=dISO(0);
+ if(!nowPag)c.pagoFecha=null;
  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
  showCompra(id);renderCompras();
+}
+function pagarCompra(id,on){
+ const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
+ if(on&&!confirm('¿Marcar esta factura como PAGADA?'))return;
+ if(!on&&!confirm('¿Marcar esta factura como NO PAGADA?'))return;
+ c.pagado=!!on;c.pagoFecha=on?dISO(0):null;
+ if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
+ closeM();renderCompras();
 }
 function renderCompras(){
  const L=db.compras||[];
  const anul=L.filter(c=>c.anulado).length;
+ const pend=L.filter(c=>!c.anulado&&!compPagada(c)).length;
  if(!L.length){$('#app').innerHTML=`<div class="empty-state"><div class="empty-ico">${ico('truck')}</div><h3>Sin notas de compra</h3><p>Registra la mercancía que entra con la carga rápida: pega el texto de la nota o sube una foto y el inventario se actualiza solo.</p><button class="btn ok" onclick="openBulk()">${ico('download')} Carga rápida</button></div>`;return}
- $('#app').innerHTML=`<div class="page-toolbar"><span class="badge info">${L.length} nota${L.length===1?'':'s'}</span>${anul?`<span class="badge danger">${anul} anulada${anul===1?'':'s'}</span>`:''}<div class="toolbar-actions"><button class="btn ok" onclick="openBulk()">${ico('download')} Carga rápida</button>${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgaAnuladas()">${ico('trash')} Borrar anuladas</button>`:''}</div></div>
- <div class="list-card">${L.map(c=>{const d=c.credito==='credito'?diasVence(c.vence):null;
+ $('#app').innerHTML=`<div class="page-toolbar"><span class="badge info">${L.length} nota${L.length===1?'':'s'}</span>${pend?`<span class="badge warn">${pend} por pagar</span>`:''}${anul?`<span class="badge danger">${anul} anulada${anul===1?'':'s'}</span>`:''}<div class="toolbar-actions"><button class="btn ok" onclick="openBulk()">${ico('download')} Carga rápida</button>${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgaAnuladas()">${ico('trash')} Borrar anuladas</button>`:''}</div></div>
+ <div class="list-card">${L.map(c=>{const pag=compPagada(c);const d=c.credito==='credito'?diasVence(c.vence):null;
   let est='',ico_cls='';
-  if(d!=null&&d<0){est=`<span class="badge danger">Vencida hace ${-d} día${-d===1?'':'s'}</span>`;ico_cls='warn'}
-  else if(d!=null&&d<=7){est=`<span class="badge warn">Vence en ${d} día${d===1?'':'s'}</span>`;ico_cls='warn'}
-  else if(d!=null)est=`<span class="badge">Vence ${fFec(c.vence)}</span>`;
-  else est=`<span class="badge ok">Contado</span>`;
+  if(c.credito==='credito'){
+   if(pag){est=`<span class="badge ok">Pagada${c.pagoFecha?' · '+fFec(c.pagoFecha):''}</span>`;ico_cls='ok'}
+   else if(d!=null&&d<0){est=`<span class="badge danger">Vencida hace ${-d} día${-d===1?'':'s'}</span>`;ico_cls='warn'}
+   else if(d!=null&&d<=7){est=`<span class="badge warn">Vence en ${d} día${d===1?'':'s'}</span>`;ico_cls='warn'}
+   else if(d!=null)est=`<span class="badge">Vence ${fFec(c.vence)}</span>`;
+   else est=`<span class="badge warn">A crédito · Por pagar</span>`;
+  }else{
+   est=pag?`<span class="badge ok">Contado · Pagada</span>`:`<span class="badge warn">Contado · Por pagar</span>`;
+   ico_cls=pag?'ok':'warn';
+  }
   if(c.anulado){est=`<span class="badge danger">Anulada</span>`+est;ico_cls='warn'}
   return `<div class="doc-row" onclick="showCompra('${c.id}')"><div class="doc-ico ${ico_cls}">${ico('truck')}</div>
   <div class="doc-main"><div class="doc-title" ${c.anulado?'style="text-decoration:line-through"':''}>${esc(c.prov||'Sin proveedor')}${c.num?' · N.º '+esc(c.num):''}</div><div class="doc-meta"><span>Nota ${fFec(c.fecha)}</span><span>·</span><span>${(c.items||[]).length} ${pl((c.items||[]).length,'artículo','artículos')}</span><span>·</span><span>${c.unidades||0} uds</span>${c.foto?`<span>·</span><span>${ico('image')} foto</span>`:''}</div><div class="doc-meta" style="margin-top:5px">${est}</div></div>
@@ -1793,14 +1817,16 @@ function renderCompras(){
 function showCompra(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  const d=c.credito==='credito'?diasVence(c.vence):null;
+ const pag=compPagada(c);
  $('#box').innerHTML=`<h3 style="margin:0;display:flex;align-items:center;gap:8px">${ico('truck')} Nota de compra ${c.num?'N.º '+esc(c.num):''}${c.anulado?' <span style="color:var(--danger);font-size:13px">· Anulada</span>':''}</h3>
  <div class="mu" style="margin-top:4px">${esc(c.prov||'')}</div>
- <div class="mu" style="margin-top:8px">Emisión: <b>${fFec(c.fecha)}</b> · Recibida: <b>${fFec(c.recibido)}</b><br>Pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>${c.credito==='credito'?` · Vence: <b>${fFec(c.vence)}</b> ${d!=null?(d<0?'<span style="color:var(--danger)">(vencida)</span>':'(faltan '+d+' días)'):''}`:''}<br>Total: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} ${pl((c.items||[]).length,'artículo','artículos')} · ${c.unidades||0} uds</div>
+ <div class="mu" style="margin-top:8px">Emisión: <b>${fFec(c.fecha)}</b> · Recibida: <b>${fFec(c.recibido)}</b><br>Pago: <b>${c.credito==='credito'?'A crédito':'Contado'}</b>${c.credito==='credito'?` · Vence: <b>${fFec(c.vence)}</b> ${d!=null?(d<0?'<span style="color:var(--danger)">(vencida)</span>':'(faltan '+d+' días)'):''}`:''}<br>Estado de pago: <b>${pag?'Pagada'+(c.pagoFecha?' ('+fFec(c.pagoFecha)+')':''):'Por pagar'}</b><br>Total: <b>${money(c.total||0)}</b> · ${(c.items||[]).length} ${pl((c.items||[]).length,'artículo','artículos')} · ${c.unidades||0} uds</div>
  ${c.anulado&&c.anuladoDate?`<div class="mu" style="color:var(--danger)">Anulada el ${fFec(c.anuladoDate)}</div>`:''}
  ${c.foto?`<img src="${c.foto}" style="width:100%;border-radius:10px;margin-top:10px;border:1px solid var(--bd)">`:''}
  <div style="margin-top:10px;max-height:220px;overflow:auto"><table class="note" style="background:var(--card);color:var(--tx)"><tr><th>Código</th><th>Descripción</th><th class="r">Cant</th><th class="r">Costo</th></tr>
  ${(c.items||[]).map(i=>`<tr><td>${esc(i.code||'')}</td><td>${esc(i.name)}</td><td class="r">${i.qty}</td><td class="r">${money(i.cost)}</td></tr>`).join('')}</table></div>
  <div class="row noprint" style="margin-top:14px">
+  ${!c.anulado?(pag?`<button class="btn g" onclick="pagarCompra('${c.id}',false)">${ico('x')} Marcar no pagada</button>`:`<button class="btn ok" onclick="pagarCompra('${c.id}',true)">${ico('check')} Marcar pagada</button>`):''}
   ${c.anulado?`<button class="btn" onclick="anularCompra('${c.id}',false)">${ico('refresh')} Reactivar</button>`:`<button class="btn g" onclick="anularCompra('${c.id}',true)">${ico('alert')} Anular</button>`}
   <button class="btn g" onclick="editCompra('${c.id}')">${ico('edit')} Editar datos</button>
   <button class="btn g" onclick="delCompra('${c.id}',true)">${ico('trash')} Solo la nota</button>
