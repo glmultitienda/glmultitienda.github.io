@@ -2556,6 +2556,15 @@ function renderRep(){
  </div>`;
  const topHtml=tl.length?tl.map(([name,t],i)=>`<div class="list-row"><div class="thumb">${i+1}</div><div class="list-main"><div class="list-title">${esc(name)}</div><div class="progress"><i style="width:${Math.max(4,Math.round(t.q/maxQ*100))}%"></i></div></div><div><div class="list-amount">${t.q} uds</div><div class="list-meta" style="text-align:right">${money(t.m)}</div></div></div>`).join(''):`<div class="empty-mini">${ico('chart')}<span>Sin ventas en ${per}</span></div>`;
  const lowHtml=low.length?low.slice(0,8).map(p=>`<div class="list-row"><div class="thumb">${ico('box')}</div><div class="list-main"><div class="list-title">${esc(p.name)}</div><div class="list-meta">${esc(p.code||'Sin código')} · ${esc(p.brand||'—')}</div></div><span class="badge ${p.stock<=0?'danger':'warn'}">${p.stock<=0?'Agotado':'Queda '+p.stock}</span></div>`).join(''):`<div class="empty-mini">${ico('check')}<span>No hay repuestos con stock bajo</span></div>`;
+ const mMap=new Map();
+ (db.notes||[]).filter(n=>!n.void).forEach(n=>{const d=new Date(n.date);if(isNaN(d))return;const k=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');if(!mMap.has(k))mMap.set(k,{k,y:d.getFullYear(),m:d.getMonth(),tot:0,notas:0});const v=mMap.get(k);v.tot+=(+n.total||0);v.notas++;});
+ const mArrAsc=[...mMap.values()].sort((a,b)=>a.k.localeCompare(b.k)).slice(-12);
+ mArrAsc.forEach((x,i)=>{x.prev=i?mArrAsc[i-1].tot:null});
+ const mArr=mArrAsc.slice().reverse();
+ const mMax=Math.max(1,...mArr.map(x=>x.tot));
+ const mesLbl=(y,m)=>new Date(y,m,1).toLocaleDateString('es',{month:'short',year:'numeric'}).replace('.','');
+ const mesesHtml=mArr.length?mArr.map(x=>{const prev=x.prev;let varHtml='';if(prev!=null&&prev>0){const p=Math.round((x.tot-prev)/prev*100);varHtml=`<span class="badge ${p>=0?'ok':'danger'}">${p>=0?'+':''}${p}%</span>`}else if(prev!=null){varHtml=`<span class="badge ok">Nuevo</span>`}else{varHtml=`<span class="badge">—</span>`}
+  return `<div class="list-row"><div class="thumb">${ico('chart')}</div><div class="list-main"><div class="list-title">${esc(mesLbl(x.y,x.m))}</div><div class="progress"><i style="width:${Math.max(4,Math.round(x.tot/mMax*100))}%"></i></div><div class="list-meta">${x.notas} ${pl(x.notas,'nota','notas')}</div></div><div style="text-align:right"><div class="list-amount">${money(x.tot)}</div><div style="margin-top:4px">${varHtml}</div></div></div>`}).join(''):`<div class="empty-mini">${ico('chart')}<span>Aún no hay ventas registradas</span></div>`;
  $('#app').innerHTML=`${repP==='todo'?moreNotes():''}
  <div class="page-toolbar"><div class="seg">${[['hoy','Hoy'],['semana','7 días'],['mes','Este mes'],['todo','Todo']].map(([k,l])=>`<button class="${repP===k?'on':''}" onclick="setRep('${k}')">${l}</button>`).join('')}</div><div class="toolbar-actions"><button class="btn g s" onclick="waRestock()">${ico('users')} Enviar reposición</button><button class="btn g s" onclick="copyRestock()">${ico('download')} Copiar lista</button></div></div>
  ${kpis}
@@ -2566,6 +2575,7 @@ function renderRep(){
   <section class="panel span-6">${phead('Por reponer',low.length+' repuesto'+(low.length===1?'':'s')+' con 1 unidad o menos')}<div class="list">${lowHtml}</div></section>
   <section class="panel span-6">${phead('Gastos por categoría',gLs.length?money(gTot)+' '+gPer:gSin,'<button class="link-btn" onclick="goView(\'gastos\')">Ver gastos</button>')}<div class="list">${gHtml}</div></section>
   <section class="panel span-6">${phead('Últimos gastos',gLs.length?'Los más recientes del período':'Sin registros')}<div class="list">${gRecentHtml}</div></section>
+  <section class="panel span-12">${phead('Ventas por mes','Crecimiento mes a mes (últimos 12 meses)')}<div class="list">${mesesHtml}</div></section>
   <section class="panel span-12">${phead('Cuentas por cobrar',fTot?money(fTot)+' pendientes · '+fPendList().length+' créditos':'Sin créditos pendientes','<button class="link-btn" onclick="goView(\'creditos\')">Ver créditos</button>')}<div class="list">${fHtml}</div></section>
  </div>`;
 }
