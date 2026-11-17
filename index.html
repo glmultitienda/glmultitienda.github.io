@@ -1494,7 +1494,7 @@ function invList(){
     <div class="pbs">${RATE?'Bs '+bsf(pr(p,'bcv')*RATE)+' · ':''}ML ${money(pr(p,'ml'))}</div>
     ${admin?`<div class="padmin">Costo ${money(p.cost)} · Ganancia ${money(pr(p,'bcv')-(p.cost||0))} BCV / ${money(pr(p,'cash')-(p.cost||0))} CASH</div>`:''}
     <div class="pfoot"><label class="switch" title="Publicado en MercadoLibre"><input type="checkbox" ${p.mlpub?'checked':''} onchange="setMlPub('${p.id}',this.checked)"><span class="track"></span>ML</label>
-     <div class="pactions"><button class="btn s g" onclick="editPart('${p.id}')" title="Editar" aria-label="Editar">${ico('edit')}</button><button class="btn s g" onclick="addStock('${p.id}')" title="Entrada de stock" aria-label="Entrada de stock">${ico('plus')}</button><button class="btn s g" onclick="quickSell('${p.id}')" ${p.stock<=0?'disabled':''} title="Vender" aria-label="Vender">${ico('cart')}</button></div>
+     <div class="pactions"><button class="btn s g" onclick="editPart('${p.id}')" title="Editar" aria-label="Editar">${ico('edit')}</button><button class="btn s g" onclick="addStock('${p.id}')" title="Entrada de stock" aria-label="Entrada de stock">${ico('plus')}</button><button class="btn s g" onclick="openHistorialVentas({partId:'${p.id}',day:'',q:''})" title="Historial de ventas" aria-label="Historial de ventas">${ico('clock')}</button><button class="btn s g" onclick="quickSell('${p.id}')" ${p.stock<=0?'disabled':''} title="Vender" aria-label="Vender">${ico('cart')}</button></div>
     </div>
    </div>
   </article>`}).join('');
@@ -2433,7 +2433,7 @@ function renderNotes(){
  }
  if(!db.notes.length){$('#app').innerHTML=moreNotes()+`<div class="page-toolbar">${seg}</div><div class="empty-state"><div class="empty-ico">${ico('receipt')}</div><h3>Aún no hay notas de entrega</h3><p>Cuando vendas un repuesto se genera la nota automáticamente, con cliente, precios y total en Bs.</p><button class="btn" onclick="goView('sell')">${ico('cart')} Crear una venta</button></div>`;return}
  const crNo=new Map((db.creditos||[]).filter(f=>f.no).map(f=>[f.no,f]));
- $('#app').innerHTML=moreNotes()+`<div class="page-toolbar">${seg}<span class="badge info">${db.notes.length} nota${db.notes.length===1?'':'s'}</span>${anul?`<span class="badge danger">${anul} anulada${anul===1?'':'s'}</span>`:''}<div class="toolbar-actions">${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgeVoidNotes()">${ico('trash')} Borrar anuladas</button>`:''}</div></div>
+ $('#app').innerHTML=moreNotes()+`<div class="page-toolbar">${seg}<span class="badge info">${db.notes.length} nota${db.notes.length===1?'':'s'}</span>${anul?`<span class="badge danger">${anul} anulada${anul===1?'':'s'}</span>`:''}<div class="toolbar-actions"><button class="btn g s" onclick="openHistorialVentas({day:dISO(0),partId:'',q:''})">${ico('clock')} Historial</button>${anul?`<button class="btn g s" style="color:var(--danger)" onclick="purgeVoidNotes()">${ico('trash')} Borrar anuladas</button>`:''}</div></div>
  <div class="list-card">${db.notes.map(n=>{const cr=crNo.get(n.no);
   return `<div class="doc-row" onclick="showNote(${n.no})"><div class="doc-ico ${n.void?'warn':'ok'}">${ico('receipt')}</div>
  <div class="doc-main"><div class="doc-title" ${n.void?'style="text-decoration:line-through"':''}>Nota N.º ${String(n.no).padStart(5,'0')} · ${esc(n.client)}</div><div class="doc-meta"><span>${new Date(n.date).toLocaleString('es')}</span><span>·</span><span>${esc(n.pay||'Sin pago')}</span>${n.ci?`<span>·</span><span>${esc(n.ci)}</span>`:''}${n.void?'<span class="badge danger">Anulada</span>':''}</div>
@@ -2571,6 +2571,56 @@ function purgeVoidNotes(){
  renderNotes();
  alert(nos.length===1?'Borrada 1 nota anulada.':'Borradas '+nos.length+' notas anuladas.');
 }
+/* ---------- HISTORIAL DE VENTAS ---------- */
+let HV={day:dISO(-1),q:'',partId:''};
+function noteDay(d){const x=new Date(d);return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')}
+function ventasLineas(){
+ const out=[];
+ (db.notes||[]).forEach(n=>{if(n.void)return;
+  (n.items||[]).forEach(it=>out.push({no:n.no,date:n.date,day:noteDay(n.date),client:n.client||'',ci:n.ci||'',partId:it.id,name:it.name||'',code:it.code||'',qty:+it.qty||0,price:+it.price||0,total:(+it.qty||0)*(+it.price||0)}));
+ });
+ return out;
+}
+function openHistorialVentas(opts={}){
+ if(opts.day)HV.day=opts.day; else if(!HV.day)HV.day=dISO(0);
+ if(opts.partId!==undefined)HV.partId=opts.partId||'';
+ if(opts.q!==undefined)HV.q=opts.q||'';
+ if(!opts.day&&!opts.partId&&!opts.q&&HV.partId===''){/* keep */}
+ renderHistorialVentas();
+}
+function setHvDay(v){HV.day=v;renderHistorialVentas()}
+function setHvQ(v){HV.q=v;renderHistorialVentas()}
+function clearHvPart(){HV.partId='';HV.q='';renderHistorialVentas()}
+function renderHistorialVentas(){
+ const all=ventasLineas();
+ const q=nz(HV.q||'');
+ const byPart=HV.partId?all.filter(x=>x.partId===HV.partId):all;
+ const byDay=HV.day?byPart.filter(x=>x.day===HV.day):byPart;
+ const byQ=q?byDay.filter(x=>nz(x.name+' '+x.code+' '+x.client+' '+x.ci).includes(q)):byDay;
+ const rows=byQ.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
+ const tot=rows.reduce((s,x)=>s+x.total,0),uds=rows.reduce((s,x)=>s+x.qty,0);
+ const partName=HV.partId?((db.parts||[]).find(p=>p.id===HV.partId)||byPart[0]||{}).name||'Repuesto':'';
+ const searchRes=!HV.day&&q?rows.slice(0,200):rows;
+ const html=searchRes.length?`<div class="list-card">${searchRes.map(x=>`<div class="doc-row" style="cursor:pointer" onclick="closeM();showNote(${x.no})">
+  <div class="doc-ico ok">${ico('receipt')}</div>
+  <div class="doc-main"><div class="doc-title">${esc(x.name)}${x.code?` <span class="mu">· ${esc(x.code)}</span>`:''}</div>
+  <div class="doc-meta"><span>${fFec(x.day)} · ${new Date(x.date).toLocaleTimeString('es',{hour:'2-digit',minute:'2-digit'})}</span><span>·</span><span>Nota N.º ${String(x.no).padStart(5,'0')}</span><span>·</span><span>${esc(x.client||'Cliente general')}</span>${x.ci?`<span>·</span><span>CI ${esc(x.ci)}</span>`:''}</div></div>
+  <div class="doc-amount">${x.qty} ud${x.qty===1?'':'s'}<div class="mu" style="font-size:11px;text-align:right">${money(x.total)}</div></div></div>`).join('')}</div>`:`<div class="empty-mini">${ico('receipt')}<span>${HV.day?'No hay ventas registradas ese día'+(HV.partId||q?' para este filtro':''):'Selecciona un día o busca un repuesto para ver su historial'}</span></div>`;
+ $('#box').innerHTML=`<h3 style="margin:0 0 4px;display:flex;align-items:center;gap:8px">${ico('clock')} Historial de ventas</h3>
+ <div class="mu" style="margin:4px 0 10px">Consulta qué se vendió por día y verifica si un repuesto fue comprado aquí (útil para devoluciones).</div>
+ ${HV.partId?`<div class="notice-bar" style="margin:0 0 10px">${ico('box')}<span>Repuesto: <b>${esc(partName)}</b></span><button class="btn s g" onclick="clearHvPart()">Ver todos</button></div>`:''}
+ <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+  <div style="flex:1;min-width:160px"><label>Día</label><input id="hv_day" type="date" value="${HV.day||''}" onchange="setHvDay(this.value)"></div>
+  <div style="flex:2;min-width:180px"><label>Buscar repuesto / cliente</label><input id="hv_q" type="search" placeholder="Nombre, código, cliente o cédula" value="${esc(HV.q||'')}" oninput="setHvQ(this.value)"></div>
+  <div><button class="btn g s" onclick="setHvDay('')">Todos los días</button></div>
+ </div>
+ <div class="page-toolbar" style="margin-top:10px"><span class="badge info">${rows.length} ${pl(rows.length,'venta','ventas')}</span><span class="badge">${uds} ud${uds===1?'':'s'}</span><span class="badge ok">${money(tot)}</span></div>
+ <div style="max-height:55vh;overflow:auto">${html}</div>
+ <div class="row noprint" style="margin-top:12px"><button class="btn g" onclick="closeM()">Cerrar</button></div>`;
+ $('#modal').classList.add('on');
+ const qEl=$('#hv_q'); if(qEl && HV.q) { try{ qEl.focus(); qEl.setSelectionRange(qEl.value.length,qEl.value.length);}catch(e){} }
+}
+
 function setRep(k){repP=k;renderRep()}
 function repFrom(){const d=new Date(),s=new Date(d.getFullYear(),d.getMonth(),d.getDate());if(repP==='semana')s.setDate(s.getDate()-6);else if(repP==='mes')s.setDate(1);else if(repP==='todo')return new Date(0);return s}
 function lowParts(){return db.parts.filter(p=>p.stock<=1).sort((a,b)=>a.stock-b.stock)}
