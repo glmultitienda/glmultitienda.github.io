@@ -1749,9 +1749,13 @@ function bulkGuarda(){
  alert('Compra guardada: '+items.length+' '+pl(items.length,'artículo','artículos')+', '+bulkUnid()+' uds, '+money(total)+'.\nEl inventario se actualizó.');
 }
 function compAbonos(c){return Array.isArray(c.abonos)?c.abonos:[]}
-function compAbonado(c){return compAbonos(c).reduce((s,a)=>s+(+a.monto||0),0)}
+function compAbonado(c){
+ const abs=compAbonos(c);
+ if(!abs.length && c.pagado===true) return Math.round((+c.total||0)*100)/100;
+ return Math.round(abs.reduce((s,a)=>s+(+a.monto||0),0)*100)/100;
+}
 function compSaldo(c){return Math.max(0,Math.round(((+c.total||0)-compAbonado(c))*100)/100)}
-function compPagada(c){if(c.pagado===true)return true;if(c.pagado===false&&compAbonos(c).length)return compSaldo(c)<=0;return compSaldo(c)<=0||(c.pagado!==false&&c.credito!=='credito')}
+function compPagada(c){return compSaldo(c)<=0}
 function editCompra(id){
  const c=(db.compras||[]).find(x=>x.id===id);if(!c)return;
  const isCred=c.credito==='credito';
@@ -1785,7 +1789,8 @@ function saveCompraData(id){
   if(saldo>0)c.abonos.push({id:uid(),fecha:dISO(0),monto:saldo,nota:'Pago total'});
   c.pagado=true; if(!c.pagoFecha)c.pagoFecha=dISO(0);
  }else{
-  c.abonos=[]; c.pagado=false; c.pagoFecha=null;
+  c.pagado = (compSaldo(c)<=0);
+  if(compSaldo(c)>0) c.pagoFecha=null;
  }
  if(R)R.doc('compras/'+id).set(JSON.parse(JSON.stringify(c))).catch(se);else save();
  showCompra(id);renderCompras();
