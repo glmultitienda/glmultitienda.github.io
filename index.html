@@ -2604,7 +2604,6 @@ function renderHistorialVentas(){
  const tot=rows.reduce((s,x)=>s+x.total,0),uds=rows.reduce((s,x)=>s+x.qty,0);
  const partName=HV.partId?(targetPart?targetPart.name:(byPart[0]||{}).name||'Repuesto'):'';
  const searchRes=!HV.day&&q?rows.slice(0,200):rows;
- const searchRes=!HV.day&&q?rows.slice(0,200):rows;
  const html=searchRes.length?`<div class="list-card">${searchRes.map(x=>`<div class="doc-row" style="cursor:pointer" onclick="closeM();showNote(${x.no})">
   <div class="doc-ico ok">${ico('receipt')}</div>
   <div class="doc-main"><div class="doc-title">${esc(x.name)}${x.code?` <span class="mu">· ${esc(x.code)}</span>`:''}</div>
