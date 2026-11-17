@@ -2594,12 +2594,16 @@ function clearHvPart(){HV.partId='';HV.q='';renderHistorialVentas()}
 function renderHistorialVentas(){
  const all=ventasLineas();
  const q=nz(HV.q||'');
- const byPart=HV.partId?all.filter(x=>x.partId===HV.partId):all;
+ const targetPart=HV.partId?(db.parts||[]).find(p=>p.id===HV.partId):null;
+ const tCode=targetPart&&targetPart.code?String(targetPart.code).trim().toUpperCase():'';
+ const tName=targetPart&&targetPart.name?nz(targetPart.name):'';
+ const byPart=HV.partId?all.filter(x=>x.partId===HV.partId || (tCode && String(x.code||'').trim().toUpperCase()===tCode) || (!tCode && tName && nz(x.name)===tName)):all;
  const byDay=HV.day?byPart.filter(x=>x.day===HV.day):byPart;
  const byQ=q?byDay.filter(x=>nz(x.name+' '+x.code+' '+x.client+' '+x.ci).includes(q)):byDay;
  const rows=byQ.sort((a,b)=>String(b.date).localeCompare(String(a.date)));
  const tot=rows.reduce((s,x)=>s+x.total,0),uds=rows.reduce((s,x)=>s+x.qty,0);
- const partName=HV.partId?((db.parts||[]).find(p=>p.id===HV.partId)||byPart[0]||{}).name||'Repuesto':'';
+ const partName=HV.partId?(targetPart?targetPart.name:(byPart[0]||{}).name||'Repuesto'):'';
+ const searchRes=!HV.day&&q?rows.slice(0,200):rows;
  const searchRes=!HV.day&&q?rows.slice(0,200):rows;
  const html=searchRes.length?`<div class="list-card">${searchRes.map(x=>`<div class="doc-row" style="cursor:pointer" onclick="closeM();showNote(${x.no})">
   <div class="doc-ico ok">${ico('receipt')}</div>
